@@ -29,8 +29,7 @@ let sidebarInjected = false;
 let isInjecting = false;
 let prevSessionPct = null;
 let prevWeeklyPct = null;
-let lastObservedSessionPct = null;
-let sessionTrendDirection = null;
+let usageRateState = 'gray'; // 'slow' | 'steady' | 'burning' | 'gray'
 
 // Global tracking references for cleanups
 let tryInjectInterval = null;
@@ -84,8 +83,7 @@ window.__usagex_cleanup = () => {
 
   prevSessionPct = null;
   prevWeeklyPct = null;
-  lastObservedSessionPct = null;
-  sessionTrendDirection = null;
+  usageRateState = 'gray';
   console.log('[UsageX] Cleaned up previous script instance.');
 };
 
@@ -241,8 +239,11 @@ windowMsgHandler = (event) => {
   if (event.data.type === '__ux_fetch_msg') {
     onMessageSent({ body: event.data.body }).catch(() => {});
   } else if (event.data.type === '__ux_usage_data') {
-    browser.storage.local.set({ usage_limits: event.data.data }).catch(() => {});
-    updateUI().catch(() => {});
+    (async () => {
+      await updateUsageRate(event.data.data.session_pct);
+      await browser.storage.local.set({ usage_limits: event.data.data });
+      await updateUI();
+    })().catch(() => {});
   }
 };
 window.addEventListener('message', windowMsgHandler);
@@ -414,19 +415,19 @@ async function injectSidebar() {
     root.classList.add('font-sans');
     root.innerHTML = getSidebarHTML();
 
-    // Add the trend arrow, tooltip target, remaining estimate, and shortcut note without rebuilding the template.
+    // Add the pulse dot, tooltip target, remaining estimate, and shortcut note without rebuilding the template.
     const sessionPctEl = root.querySelector('#ux-session-pct');
-    if (sessionPctEl && !root.querySelector('#ux-session-trend')) {
+    if (sessionPctEl && !root.querySelector('#ux-rate-dot')) {
       const pctWrap = document.createElement('span');
       pctWrap.className = 'ux-pct-wrap';
       sessionPctEl.parentElement.replaceChild(pctWrap, sessionPctEl);
       pctWrap.appendChild(sessionPctEl);
 
-      const trendEl = document.createElement('span');
-      trendEl.id = 'ux-session-trend';
-      trendEl.className = 'ux-trend';
-      trendEl.setAttribute('aria-hidden', 'true');
-      pctWrap.appendChild(trendEl);
+      const dotEl = document.createElement('span');
+      dotEl.id = 'ux-rate-dot';
+      dotEl.className = 'ux-rate-dot ux-rate-gray';
+      dotEl.setAttribute('data-tooltip', 'Usage rate: Calculating...');
+      pctWrap.appendChild(dotEl);
     }
 
     const sessionTrack = root.querySelector('#ux-bar-session')?.parentElement;
@@ -562,14 +563,37 @@ function estimateMessagesRemaining(sessionPct, sessionResetAt, debugLogs) {
   return Math.max(0, Math.floor(remainingTokens / avgTokensPerMessage));
 }
 
-// Compare the latest two observed session percentages to render a subtle trend arrow.
-function updateSessionTrend(sessionPct) {
+// Compare the current session_pct against previous to determine usage rate state.
+async function updateUsageRate(sessionPct) {
   if (sessionPct == null || Number.isNaN(Number(sessionPct))) return;
   const numericPct = Number(sessionPct);
-  if (lastObservedSessionPct != null) {
-    sessionTrendDirection = numericPct > lastObservedSessionPct ? 'up' : 'down';
+  try {
+    const res = await browser.storage.local.get(['usagex_prev_session_pct', 'usagex_usage_rate_state']);
+    const prevPct = res.usagex_prev_session_pct;
+    
+    if (prevPct === undefined || numericPct !== Number(prevPct)) {
+      if (prevPct != null && Number.isFinite(Number(prevPct))) {
+        const delta = numericPct - Number(prevPct);
+        if (delta > 15) {
+          usageRateState = 'burning';
+        } else if (delta >= 5) {
+          usageRateState = 'steady';
+        } else {
+          usageRateState = 'slow';
+        }
+      } else {
+        usageRateState = 'gray';
+      }
+      await browser.storage.local.set({
+        usagex_prev_session_pct: numericPct,
+        usagex_usage_rate_state: usageRateState
+      });
+    } else {
+      usageRateState = res.usagex_usage_rate_state || 'gray';
+    }
+  } catch (_) {
+    usageRateState = 'gray';
   }
-  lastObservedSessionPct = numericPct;
 }
 
 // Keep shortcut and header collapse behavior identical.
@@ -629,7 +653,13 @@ async function updateUI() {
   // Usage % from API or DOM
   const sessionPct = usage_limits?.session_pct;
   const weeklyPct = usage_limits?.weekly_pct;
-  updateSessionTrend(sessionPct);
+
+  try {
+    const res = await browser.storage.local.get('usagex_usage_rate_state');
+    usageRateState = res.usagex_usage_rate_state || 'gray';
+  } catch (_) {
+    usageRateState = 'gray';
+  }
 
   setEl('#ux-session-pct', sessionPct != null ? `${formatPctValue(sessionPct)}%` : '—');
   setEl('#ux-weekly-pct', weeklyPct != null ? `${formatPctValue(weeklyPct)}%` : '—');
@@ -656,18 +686,16 @@ async function updateUI() {
   const weeklyPctEl = root.querySelector('#ux-weekly-pct');
   if (weeklyPctEl) weeklyPctEl.style.color = getThresholdColor(weeklyPct);
 
-  const sessionTrendEl = root.querySelector('#ux-session-trend');
-  if (sessionTrendEl) {
-    if (sessionTrendDirection === 'up') {
-      sessionTrendEl.textContent = '↑';
-      sessionTrendEl.className = 'ux-trend ux-trend-up';
-    } else if (sessionTrendDirection === 'down') {
-      sessionTrendEl.textContent = '↓';
-      sessionTrendEl.className = 'ux-trend ux-trend-down';
-    } else {
-      sessionTrendEl.textContent = '';
-      sessionTrendEl.className = 'ux-trend';
-    }
+  const rateDotEl = root.querySelector('#ux-rate-dot');
+  if (rateDotEl) {
+    const rateTooltips = {
+      slow: 'Usage rate: Slow — you\'re well within limits',
+      steady: 'Usage rate: Steady — normal usage pace',
+      burning: 'Usage rate: High — burning through session fast',
+      gray: 'Usage rate: Calculating...'
+    };
+    rateDotEl.className = 'ux-rate-dot ux-rate-' + usageRateState;
+    rateDotEl.setAttribute('data-tooltip', rateTooltips[usageRateState] || rateTooltips.gray);
   }
 
   const sessionTrack = root.querySelector('#ux-session-track');
@@ -1346,8 +1374,10 @@ function getCSS() {
   justify-content: center;
   transform: translateY(1.5px);
 }
-#usagex-v2-root.ux-minimized .ux-dot {
+#usagex-v2-root.ux-minimized .ux-dot::before {
   animation: none;
+}
+#usagex-v2-root.ux-minimized .ux-dot {
   opacity: 0.6;
 }
 #ux-settings-panel { display: none; }
@@ -1386,6 +1416,14 @@ function getCSS() {
   right: -2px;
   width: 5px;
   height: 5px;
+}
+.ux-dot::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   background: var(--ux-accent);
   box-shadow: 0 0 0 1.5px var(--ux-surface);
@@ -1414,10 +1452,7 @@ function getCSS() {
   font-weight: 500 !important;
   line-height: 16px !important;
   display: block !important;
-  box-sizing: content-box !important;
-  height: 16px !important;
-  min-height: 16px !important;
-  max-height: 16px !important;
+  box-sizing: border-box !important;
   padding: 4px 8px !important;
   border-radius: 4px !important;
   white-space: nowrap !important;
@@ -1432,6 +1467,14 @@ function getCSS() {
 }
 #usagex-v2-root [data-tooltip]:hover::after {
   opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+#usagex-v2-root #ux-rate-dot[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+}
+#usagex-v2-root #ux-rate-dot[data-tooltip]:hover::after {
   transform: translateX(-50%) translateY(0);
 }
 /* Badge tooltip appears above (it sits in the title row, not a button) */
@@ -1479,32 +1522,64 @@ function getCSS() {
 .ux-bar-label { font-size: 14px; color: var(--ux-text-1); font-weight: 600; }
 .ux-pct-wrap {
   display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
+  align-items: center;
+  gap: 5px;
 }
 .ux-pct { font-size: 14px; font-weight: 700; color: var(--ux-accent); letter-spacing: -0.01em; }
-.ux-trend {
-  min-width: 9px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
+.ux-rate-dot {
+  width: 8px;
+  height: 8px;
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+  position: relative;
 }
-.ux-trend-up {
-  color: var(--ux-red);
+.ux-rate-dot::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
 }
-.ux-trend-down {
-  color: var(--ux-green-bright);
+.ux-rate-gray::before {
+  background: #555;
 }
-.ux-track { height: 4px; background: #282828; border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
-.ux-track[data-tooltip] { overflow: visible; cursor: help; }
-.ux-track.ux-track-session[data-tooltip]::after,
-.ux-track.ux-track-weekly[data-tooltip]::after {
+.ux-rate-slow::before {
+  background: var(--ux-green-bright);
+  animation: ux-pulse-slow 2.5s ease-in-out infinite;
+}
+.ux-rate-steady::before {
+  background: var(--ux-yellow);
+  animation: ux-pulse-medium 1.2s ease-in-out infinite;
+}
+.ux-rate-burning::before {
+  background: var(--ux-red);
+  animation: ux-pulse-fast 0.5s ease-in-out infinite;
+}
+@keyframes ux-pulse-slow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes ux-pulse-medium {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+@keyframes ux-pulse-fast {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.8); }
+}
+#usagex-v2-root .ux-track { height: 4px; background: #282828; border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
+#usagex-v2-root .ux-track[data-tooltip] { overflow: visible; cursor: help; }
+#usagex-v2-root .ux-track.ux-track-session[data-tooltip]::after,
+#usagex-v2-root .ux-track.ux-track-weekly[data-tooltip]::after {
   top: auto;
   bottom: calc(100% + 7px);
   transform: translateX(-50%) translateY(3px);
 }
-.ux-track.ux-track-session[data-tooltip]:hover::after,
-.ux-track.ux-track-weekly[data-tooltip]:hover::after {
+#usagex-v2-root .ux-track.ux-track-session[data-tooltip]:hover::after,
+#usagex-v2-root .ux-track.ux-track-weekly[data-tooltip]:hover::after {
   transform: translateX(-50%) translateY(0);
 }
 .ux-fill { height: 100%; border-radius: 2px; transition: none; }
@@ -1703,6 +1778,7 @@ async function fetchUsageLimitsActive() {
         weekly_pct: json.seven_day ? (json.seven_day.utilization ?? null) : null,
         weekly_resets_at: json.seven_day ? (json.seven_day.resets_at || null) : null,
       };
+      await updateUsageRate(data.session_pct);
       await browser.storage.local.set({ usage_limits: data });
       await updateUI();
       await debugLog('active_fetch_success', data);
