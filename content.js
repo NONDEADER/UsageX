@@ -19,6 +19,7 @@ const IDLE_MS = 2 * 60 * 1000;
 const TICK_MS = 10000;
 const SESSION_WINDOW_MS = 5 * 60 * 60 * 1000;
 const SESSION_TOKEN_LIMIT = 375000;
+const WEEKLY_TOKEN_LIMIT = 3750000;
 
 
 
@@ -524,8 +525,8 @@ function getSessionTooltipText(sessionPct) {
 function getWeeklyTooltipText(weeklyPct) {
   if (weeklyPct == null) return '';
   const pct = clamp(Number(weeklyPct) || 0, 0, 100);
-  const usedTokens = Math.round((pct / 100) * SESSION_TOKEN_LIMIT);
-  return `${formatTokenCount(usedTokens)} / ${formatTokenCount(SESSION_TOKEN_LIMIT)} tokens (${formatPctValue(weeklyPct)}%)`;
+  const usedTokens = Math.round((pct / 100) * WEEKLY_TOKEN_LIMIT);
+  return `${formatTokenCount(usedTokens)} / ${formatTokenCount(WEEKLY_TOKEN_LIMIT)} tokens (${formatPctValue(weeklyPct)}%)`;
 }
 
 // Estimate remaining messages from msg_sent debug logs in the active 5-hour session window.
