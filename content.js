@@ -181,7 +181,10 @@ function formatResetTimeDisplay(timestamp, timezone) {
   const diff = timestamp - Date.now();
   if (diff <= 0) return 'resetting now';
   const resetDate = new Date(timestamp);
-  const timeStr = formatTimeAMPM(resetDate);
+  const timeStr = resetDate.toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
   const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
   const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
   let remaining;
@@ -193,7 +196,7 @@ function formatResetTimeDisplay(timestamp, timezone) {
   } else {
     remaining = `${hoursLeft}h ${minutesLeft}m remaining`;
   }
-  return `${remaining} · resets ${timeStr} ${timezone}`;
+  return `${remaining} · resets ${timeStr}`;
 }
 
 function formatWeeklyResetDisplay(timestamp, timezone) {
@@ -204,7 +207,10 @@ function formatWeeklyResetDisplay(timestamp, timezone) {
   const day = dayNames[resetDate.getDay()];
   const date = resetDate.getDate();
   const month = monthNames[resetDate.getMonth()];
-  const timeStr = formatTimeAMPM(resetDate);
+  const timeStr = resetDate.toLocaleTimeString([], { 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
   const diff = timestamp - Date.now();
   let remaining;
   if (diff <= 0) { remaining = 'resetting now'; }
@@ -217,7 +223,7 @@ function formatWeeklyResetDisplay(timestamp, timezone) {
     } else if (hoursLeft === 0) { remaining = `${minutesLeft}m remaining`; }
     else { remaining = `${hoursLeft}h ${minutesLeft}m remaining`; }
   }
-  return `${remaining} · resets ${date} ${month}, ${day} at ${timeStr} ${timezone}`;
+  return `${remaining} · resets ${date} ${month}, ${day} at ${timeStr}`;
 }
 
 // ─── Fetch interception (via injected MAIN-world script) ──────────────────────
@@ -1400,22 +1406,29 @@ function getCSS() {
   top: calc(100% + 7px);
   left: 50%;
   transform: translateX(-50%) translateY(-3px);
-  background: #2a2a2a;
-  color: var(--ux-text-1);
-  font-size: 11.5px;
-  font-weight: 500;
-  line-height: 1;
-  padding: 5px 9px;
-  border-radius: 7px;
-  white-space: nowrap;
-  pointer-events: none;
+  background: rgba(26, 26, 26, 0.85) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: #e0e0e0 !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  line-height: 16px !important;
+  display: block !important;
+  box-sizing: content-box !important;
+  height: 16px !important;
+  min-height: 16px !important;
+  max-height: 16px !important;
+  padding: 4px 8px !important;
+  border-radius: 4px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
   opacity: 0;
   transition: opacity 0.15s ease, transform 0.15s ease;
   z-index: 2147483647;
-  border: 1px solid rgba(255,255,255,0.07);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-  font-family: var(--ux-font);
-  letter-spacing: 0.01em;
+  border: 1px solid #333 !important;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+  font-family: var(--ux-font) !important;
+  letter-spacing: 0.01em !important;
 }
 #usagex-v2-root [data-tooltip]:hover::after {
   opacity: 1;
@@ -1455,6 +1468,9 @@ function getCSS() {
 .ux-bar-item:hover {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
+}
+.ux-bar-item:first-child {
+  margin-bottom: 8px;
 }
 .ux-bar-top {
   display: flex; justify-content: space-between;
@@ -1516,21 +1532,25 @@ function getCSS() {
   line-height: 1.35;
   margin-top: 3px;
 }
+#ux-session-remaining {
+  font-size: 11px;
+  color: #666;
+  margin-top: 4px;
+  font-style: italic;
+}
 .ux-action-row { display: flex; gap: 8px; margin-top: 12px; }
 .ux-act-btn {
   flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 6px 10px; background: rgba(255, 255, 255, 0.02);
-  border: none; border-radius: var(--ux-radius);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
-  font-size: 11px; color: var(--ux-text-3); cursor: pointer;
+  padding: 5px 10px; background: #1a1a1a;
+  border: 1px solid #333; border-radius: 6px;
+  font-size: 11px; color: #aaa; cursor: pointer;
   font-family: var(--ux-font); font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
   position: relative;
 }
 .ux-act-btn:hover {
   background: rgba(255, 255, 255, 0.06);
   color: var(--ux-text-2);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 .ux-act-btn:active {
   background: rgba(255, 255, 255, 0.15);
