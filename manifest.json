@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "UsageX v2",
+  "version": "2.0.0",
+  "description": "Track Claude.ai usage stats — session %, weekly %, effort breakdown, and more.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://www.claude.ai/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "debug-viewer.html",
+        "debug-viewer.css",
+        "debug-viewer.js",
+        "inject.js"
+      ],
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "UsageX v2"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "usagex-v2@ayumystic",
+      "strict_min_version": "109.0"
+    }
+  }
+}

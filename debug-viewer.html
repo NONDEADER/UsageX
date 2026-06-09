@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UsageX - Debug Logs</title>
+  <link rel="stylesheet" href="debug-viewer.css" />
+</head>
+<body>
+  <div class="dv-header">
+    <div class="dv-header-left">
+      <span class="dv-dot"></span>
+      <span class="dv-title">Debug Logs</span>
+      <span class="dv-count" id="logCount">0 logs</span>
+    </div>
+    <div class="dv-header-right">
+      <button class="dv-btn" id="refreshBtn">⟳ Refresh</button>
+      <button class="dv-btn" id="exportBtn">⬇ Export</button>
+      <button class="dv-btn dv-btn-danger" id="clearBtn">✕ Clear</button>
+    </div>
+  </div>
+  <div class="dv-body" id="logContainer">
+    <div class="dv-empty">
+      <svg class="dv-empty-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <div class="dv-empty-title">No logs yet</div>
+      <div class="dv-empty-desc">Enable debug logging in Settings to start tracking.</div>
+    </div>
+  </div>
+  <script src="debug-viewer.js"></script>
+</body>
+</html>

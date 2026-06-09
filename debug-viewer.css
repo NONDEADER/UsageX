@@ -1,0 +1,194 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #121212;
+  color: #999;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #1c1c1c;
+  border-bottom: 1px solid #252525;
+  flex-shrink: 0;
+}
+
+.dv-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #c9b89a;
+  flex-shrink: 0;
+}
+
+.dv-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #ddd;
+}
+
+.dv-count {
+  font-size: 12px;
+  color: #666;
+  font-weight: 500;
+}
+
+.dv-header-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dv-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #1f1f1f;
+  color: #999;
+  border: 1px solid #272727;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: inherit;
+}
+
+.dv-btn:hover {
+  background: #252525;
+  color: #ddd;
+  border-color: #333;
+}
+
+.dv-btn-danger {
+  background: rgba(192, 57, 43, 0.12);
+  color: #c07070;
+  border-color: rgba(192, 57, 43, 0.3);
+}
+.dv-btn-danger:hover {
+  background: #2a1515;
+  color: #e06969;
+  border-color: #3a2020;
+}
+
+.dv-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  background: #151515;
+}
+
+.dv-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 100px 24px;
+}
+
+.dv-empty-icon {
+  color: #3a3a3a;
+  margin-bottom: 16px;
+  animation: dv-pulse-icon 3s ease-in-out infinite;
+}
+
+.dv-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #8c8c8c;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.dv-empty-desc {
+  font-size: 12px;
+  color: #555555;
+  max-width: 280px;
+  line-height: 1.6;
+}
+
+@keyframes dv-pulse-icon {
+  0%, 100% { opacity: 0.6; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.96); }
+}
+
+.dv-log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  background: #1c1c1c;
+  border: 1px solid #222;
+  border-radius: 6px;
+  margin: 4px 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-family: "SF Mono", Monaco, "Cascadia Code", "Consolas", monospace;
+  line-height: 1.5;
+}
+
+.dv-log-entry:hover {
+  background: #1d1d1d;
+}
+
+.dv-log-time {
+  color: #555;
+  flex-shrink: 0;
+  font-size: 11px;
+  min-width: 80px;
+}
+
+.dv-log-scope {
+  color: #5a7a5a;
+  flex-shrink: 0;
+  min-width: 60px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.dv-log-message {
+  color: #aaa;
+  word-break: break-word;
+}
+
+.dv-log-error .dv-log-scope {
+  color: #e06969;
+}
+
+.dv-log-error .dv-log-message {
+  color: #e06969;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
