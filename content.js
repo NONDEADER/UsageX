@@ -30,7 +30,7 @@ let sidebarInjected = false;
 let isInjecting = false;
 let prevSessionPct = null;
 let prevWeeklyPct = null;
-let usageRateState = 'gray'; // 'slow' | 'steady' | 'burning' | 'gray'
+let usageRateState = 'gray'; // 'extreme' | 'up' | 'neutral' | 'down' | 'gray'
 
 // Global tracking references for cleanups
 let tryInjectInterval = null;
@@ -241,8 +241,9 @@ windowMsgHandler = (event) => {
     onMessageSent({ body: event.data.body }).catch(() => {});
   } else if (event.data.type === '__ux_usage_data') {
     (async () => {
-      await updateUsageRate(event.data.data.session_pct);
-      await browser.storage.local.set({ usage_limits: event.data.data });
+      const d = event.data.data;
+      await updateUsageRate(d.session_pct, d.session_resets_at);
+      await browser.storage.local.set({ usage_limits: d });
       await updateUI();
     })().catch(() => {});
   }
@@ -564,34 +565,39 @@ function estimateMessagesRemaining(sessionPct, sessionResetAt, debugLogs) {
   return Math.max(0, Math.floor(remainingTokens / avgTokensPerMessage));
 }
 
-// Compare the current session_pct against previous to determine usage rate state.
-async function updateUsageRate(sessionPct) {
+// Calculate usage rate = session% / hours elapsed in 5h window.
+// Mirrors SuperClaude's logic: ideal pace is ~20%/h (100% over 5h).
+// ≥30%/h → extreme (purple ↑↑), >21%/h → up (red ↑),
+// 19–21%/h → neutral (gray =), <19%/h → down (green ↓)
+function calcUsageRateState(sessionPct, sessionResetsAt) {
+  if (sessionPct == null || !sessionResetsAt) return 'gray';
+  const pct = Number(sessionPct);
+  if (!Number.isFinite(pct)) return 'gray';
+
+  const SESSION_HOURS = 5;
+  const resetMs = new Date(sessionResetsAt).getTime();
+  if (!Number.isFinite(resetMs)) return 'gray';
+
+  const msRemaining = resetMs - Date.now();
+  if (msRemaining <= 0) return 'gray';
+
+  const hoursElapsed = SESSION_HOURS - msRemaining / 3600000;
+  // Not enough time elapsed for a meaningful rate
+  if (hoursElapsed <= 0) return pct > 0 ? 'extreme' : 'gray';
+
+  const ratePerHour = pct / hoursElapsed;
+
+  if (ratePerHour >= 30) return 'extreme';
+  if (ratePerHour > 21)  return 'up';
+  if (ratePerHour >= 19) return 'neutral';
+  return 'down';
+}
+
+async function updateUsageRate(sessionPct, sessionResetsAt) {
   if (sessionPct == null || Number.isNaN(Number(sessionPct))) return;
-  const numericPct = Number(sessionPct);
   try {
-    const res = await browser.storage.local.get(['usagex_prev_session_pct', 'usagex_usage_rate_state']);
-    const prevPct = res.usagex_prev_session_pct;
-    
-    if (prevPct === undefined || numericPct !== Number(prevPct)) {
-      if (prevPct != null && Number.isFinite(Number(prevPct))) {
-        const delta = numericPct - Number(prevPct);
-        if (delta > 15) {
-          usageRateState = 'burning';
-        } else if (delta >= 5) {
-          usageRateState = 'steady';
-        } else {
-          usageRateState = 'slow';
-        }
-      } else {
-        usageRateState = 'gray';
-      }
-      await browser.storage.local.set({
-        usagex_prev_session_pct: numericPct,
-        usagex_usage_rate_state: usageRateState
-      });
-    } else {
-      usageRateState = res.usagex_usage_rate_state || 'gray';
-    }
+    usageRateState = calcUsageRateState(sessionPct, sessionResetsAt);
+    await browser.storage.local.set({ usagex_usage_rate_state: usageRateState });
   } catch (_) {
     usageRateState = 'gray';
   }
@@ -655,12 +661,8 @@ async function updateUI() {
   const sessionPct = usage_limits?.session_pct;
   const weeklyPct = usage_limits?.weekly_pct;
 
-  try {
-    const res = await browser.storage.local.get('usagex_usage_rate_state');
-    usageRateState = res.usagex_usage_rate_state || 'gray';
-  } catch (_) {
-    usageRateState = 'gray';
-  }
+  // Recalculate rate live (so it refreshes on every UI poll, not just on fetch)
+  usageRateState = calcUsageRateState(sessionPct, usage_limits?.session_resets_at);
 
   setEl('#ux-session-pct', sessionPct != null ? `${formatPctValue(sessionPct)}%` : '—');
   setEl('#ux-weekly-pct', weeklyPct != null ? `${formatPctValue(weeklyPct)}%` : '—');
@@ -689,14 +691,17 @@ async function updateUI() {
 
   const rateDotEl = root.querySelector('#ux-rate-dot');
   if (rateDotEl) {
-    const rateTooltips = {
-      slow: 'Usage rate: Slow — you\'re well within limits',
-      steady: 'Usage rate: Steady — normal usage pace',
-      burning: 'Usage rate: High — burning through session fast',
-      gray: 'Usage rate: Calculating...'
+    const rateConfig = {
+      extreme: { label: 'Overuse (≥30%/h) — burning fast!', cls: 'ux-rate-extreme' },
+      up:      { label: 'Above normal (>21%/h)',             cls: 'ux-rate-up'      },
+      neutral: { label: 'On track (~20%/h)',                 cls: 'ux-rate-neutral' },
+      down:    { label: 'Below normal (<19%/h) — good!',    cls: 'ux-rate-down'   },
+      gray:    { label: 'Usage rate: Calculating...',        cls: 'ux-rate-gray'   },
     };
-    rateDotEl.className = 'ux-rate-dot ux-rate-' + usageRateState;
-    rateDotEl.setAttribute('data-tooltip', rateTooltips[usageRateState] || rateTooltips.gray);
+    const cfg = rateConfig[usageRateState] || rateConfig.gray;
+    rateDotEl.className = 'ux-rate-dot ' + cfg.cls;
+    rateDotEl.textContent = '';
+    rateDotEl.setAttribute('data-tooltip', cfg.label);
   }
 
   const sessionTrack = root.querySelector('#ux-session-track');
@@ -1538,38 +1543,23 @@ function getCSS() {
 .ux-rate-dot::before {
   content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
   border-radius: 50%;
 }
-.ux-rate-gray::before {
-  background: #555;
+/* Unique palette — distinct from SuperClaude's purple/red/gray/green */
+.ux-rate-gray::before    { background: #3f3f46; }
+.ux-rate-down::before    { background: #2dd4bf; animation: ux-dot-pulse 2.5s ease-in-out infinite; }
+.ux-rate-neutral::before { background: #64748b; animation: ux-dot-pulse 3s ease-in-out infinite; }
+.ux-rate-up::before      { background: #fbbf24; animation: ux-dot-pulse 1.1s ease-in-out infinite; }
+.ux-rate-extreme::before {
+  background: #f97316;
+  animation: ux-dot-pulse 0.5s ease-in-out infinite;
+  box-shadow: 0 0 5px rgba(249,115,22,0.7);
 }
-.ux-rate-slow::before {
-  background: var(--ux-green-bright);
-  animation: ux-pulse-slow 2.5s ease-in-out infinite;
-}
-.ux-rate-steady::before {
-  background: var(--ux-yellow);
-  animation: ux-pulse-medium 1.2s ease-in-out infinite;
-}
-.ux-rate-burning::before {
-  background: var(--ux-red);
-  animation: ux-pulse-fast 0.5s ease-in-out infinite;
-}
-@keyframes ux-pulse-slow {
+@keyframes ux-dot-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-@keyframes ux-pulse-medium {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.4; transform: scale(0.85); }
-}
-@keyframes ux-pulse-fast {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.3; transform: scale(0.8); }
+  50%       { opacity: 0.35; transform: scale(0.8); }
 }
 #usagex-v2-root .ux-track { height: 4px; background: #282828; border-radius: 2px; overflow: hidden; margin-bottom: 6px; }
 #usagex-v2-root .ux-track[data-tooltip] { overflow: visible; cursor: help; }
@@ -1779,7 +1769,7 @@ async function fetchUsageLimitsActive() {
         weekly_pct: json.seven_day ? (json.seven_day.utilization ?? null) : null,
         weekly_resets_at: json.seven_day ? (json.seven_day.resets_at || null) : null,
       };
-      await updateUsageRate(data.session_pct);
+      await updateUsageRate(data.session_pct, data.session_resets_at);
       await browser.storage.local.set({ usage_limits: data });
       await updateUI();
       await debugLog('active_fetch_success', data);
