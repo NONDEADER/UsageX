@@ -38,6 +38,7 @@ let urlCheckInterval = null;
 let timeTrackingInterval = null;
 let idleCheckInterval = null;
 let pollInterval = null;
+let peakClockInterval = null;
 let globalObserver = null;
 let dragMoveHandler = null;
 let dragUpHandler = null;
@@ -52,6 +53,7 @@ window.__usagex_cleanup = () => {
   if (timeTrackingInterval) clearInterval(timeTrackingInterval);
   if (idleCheckInterval) clearInterval(idleCheckInterval);
   if (pollInterval) clearInterval(pollInterval);
+  if (peakClockInterval) clearInterval(peakClockInterval);
 
   if (globalObserver) {
     globalObserver.disconnect();
@@ -842,6 +844,152 @@ async function updateUI() {
   } else {
     root.style.setProperty('--ux-floating-opacity', '1');
   }
+  updatePeakClock();
+}
+
+// ─── Peak Hours Clock ──────────────────────────────────────────────────────────
+
+function getPeakClockIST() {
+  // Returns current time as fractional hours in IST (UTC+5:30)
+  const now = new Date();
+  const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+  const istMs = utcMs + 5.5 * 3600000;
+  const ist = new Date(istMs);
+  return { h: ist.getHours(), m: ist.getMinutes(), dayOfWeek: ist.getDay() };
+}
+
+function buildPeakClockSVG() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const cx = 44, cy = 44, R = 36;
+
+  const { h, m, dayOfWeek } = getPeakClockIST();
+  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+
+  // Current time as fractional hours (0-24)
+  const curH = h + m / 60;
+
+  // Peak zone: 18:30 to 24:30 (= next day 0:30)
+  // On the 24-h dial: 18.5h to 24.5h, but we wrap 24.5 → 0.5
+  // Arc colour
+  const arcColor = isWeekend ? '#555555' : '#ef4444';
+
+  // Tooltip
+  const inPeak = !isWeekend && (curH >= 18.5 || curH < 0.5);
+  const tooltip = inPeak
+    ? 'Peak hours (6:30 PM\u20131 2:30 AM IST) \u2014 Claude limits deplete faster'
+    : 'Off-peak \u2014 good time to use Claude';
+
+  function angleForH(fh) {
+    // 0h (midnight) at top = -90°, clockwise, 360° = 24h
+    return (fh / 24) * 360 - 90;
+  }
+
+  function polarPt(angleDeg, r) {
+    const rad = angleDeg * Math.PI / 180;
+    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  }
+
+  function arcPath(startH, endH, r) {
+    // Draw arc from startH to endH (hours, 0-24), on circle of radius r
+    const a1 = angleForH(startH);
+    const a2 = angleForH(endH);
+    const p1 = polarPt(a1, r);
+    const p2 = polarPt(a2, r);
+    const delta = ((endH - startH) + 24) % 24;
+    const largeArc = delta > 12 ? 1 : 0;
+    return `M ${p1.x.toFixed(3)} ${p1.y.toFixed(3)} A ${r} ${r} 0 ${largeArc} 1 ${p2.x.toFixed(3)} ${p2.y.toFixed(3)}`;
+  }
+
+  const svgEl = document.getElementById('ux-peak-clock');
+  if (!svgEl) return;
+
+  // Clear existing
+  while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+
+  function mk(tag, attrs) {
+    const el = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
+    return el;
+  }
+
+  // Background circle
+  svgEl.appendChild(mk('circle', { cx, cy, r: R + 4, fill: '#1a1a1a' }));
+
+  // Ring
+  svgEl.appendChild(mk('circle', { cx, cy, r: R, fill: 'none', stroke: '#333', 'stroke-width': '1.2' }));
+
+  // Hour ticks
+  for (let i = 0; i < 24; i++) {
+    const ang = angleForH(i);
+    const isMajor = i % 6 === 0;
+    const inner = isMajor ? R - 5 : R - 3;
+    const outer = R;
+    const p1 = polarPt(ang, inner);
+    const p2 = polarPt(ang, outer);
+    svgEl.appendChild(mk('line', {
+      x1: p1.x.toFixed(2), y1: p1.y.toFixed(2),
+      x2: p2.x.toFixed(2), y2: p2.y.toFixed(2),
+      stroke: isMajor ? '#666' : '#3a3a3a',
+      'stroke-width': isMajor ? '1.2' : '0.7',
+      'stroke-linecap': 'round'
+    }));
+
+    // Labels at 0, 6, 12, 18
+    if (isMajor) {
+      const labelR = R - 10;
+      const lp = polarPt(ang, labelR);
+      const labels = { 0: '12', 6: '6', 12: '12', 18: '18' };
+      const txt = mk('text', {
+        x: lp.x.toFixed(2), y: lp.y.toFixed(2),
+        'text-anchor': 'middle',
+        'dominant-baseline': 'central',
+        fill: '#555',
+        'font-size': '7',
+        'font-family': 'inherit'
+      });
+      txt.textContent = labels[i];
+      svgEl.appendChild(txt);
+    }
+  }
+
+  // Peak arc (18:30 → 24:30, i.e. 0:30 next day wrapping)
+  // Split into two arcs: 18.5 → 24 and 0 → 0.5 to handle the midnight wrap
+  const arcPath1 = arcPath(18.5, 24, R);
+  const arcPath2 = arcPath(0, 0.5, R);
+  svgEl.appendChild(mk('path', {
+    d: arcPath1,
+    fill: 'none',
+    stroke: arcColor,
+    'stroke-width': '4',
+    'stroke-linecap': 'round'
+  }));
+  svgEl.appendChild(mk('path', {
+    d: arcPath2,
+    fill: 'none',
+    stroke: arcColor,
+    'stroke-width': '4',
+    'stroke-linecap': 'round'
+  }));
+
+  // Current time dot
+  const dotAng = angleForH(curH);
+  const dp = polarPt(dotAng, R);
+  svgEl.appendChild(mk('circle', {
+    cx: dp.x.toFixed(3),
+    cy: dp.y.toFixed(3),
+    r: '3.5',
+    fill: '#ffffff',
+    'stroke': '#1a1a1a',
+    'stroke-width': '1'
+  }));
+
+  // Update tooltip on wrapper
+  const wrap = document.getElementById('ux-peak-clock-wrap');
+  if (wrap) wrap.setAttribute('data-tooltip', tooltip);
+}
+
+function updatePeakClock() {
+  buildPeakClockSVG();
 }
 
 function setEl(sel, text) {
@@ -1138,6 +1286,10 @@ function getSidebarHTML() {
         <div class="ux-track"><div class="ux-fill ux-fill-weekly" id="ux-bar-weekly" style="width:0%"></div></div>
         <div class="ux-time" id="ux-weekly-time"></div>
       </div>
+    </div>
+
+    <div id="ux-peak-clock-wrap" data-tooltip="">
+      <svg id="ux-peak-clock" width="88" height="88" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-label="Peak hours clock"></svg>
     </div>
 
     <div class="ux-action-row">
@@ -1727,6 +1879,29 @@ function getCSS() {
   color: #ff8888;
   transform: scale(0.98);
 }
+#ux-peak-clock-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 10px;
+  position: relative;
+  cursor: default;
+}
+#ux-peak-clock-wrap[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+  white-space: normal !important;
+  max-width: 180px;
+  text-align: center;
+}
+#ux-peak-clock-wrap[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+#ux-peak-clock {
+  display: block;
+  border-radius: 50%;
+  overflow: visible;
+}
   `;
 }
 
@@ -1803,6 +1978,11 @@ async function init() {
   urlCheckInterval = setInterval(checkUrlChange, 1000);
   startTimeTracking();
   pollUsageLimits();
+
+  // Update peak clock every minute so the time dot stays accurate
+  peakClockInterval = setInterval(() => {
+    updatePeakClock();
+  }, 60000);
 
   let observerTimeout = null;
   globalObserver = new MutationObserver(() => {
