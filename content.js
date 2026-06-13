@@ -455,19 +455,15 @@ async function injectSidebar() {
       sessionTimeEl.insertAdjacentElement('afterend', remainingEl);
     }
 
-    const advancedBtn = root.querySelector('#ux-advanced-btn');
-    if (advancedBtn && !root.querySelector('.ux-shortcut-note')) {
-      const shortcutNote = document.createElement('div');
-      shortcutNote.className = 'ux-shortcut-note';
-      shortcutNote.textContent = 'Alt+U to toggle panel';
-      advancedBtn.insertAdjacentElement('beforebegin', shortcutNote);
-    }
-
     // Apply saved mode classes before insertion
     const settingsRes = await browser.storage.local.get('settings');
     const s = settingsRes.settings || defaultSettings();
     if (s.minimized) {
       root.classList.add('ux-minimized');
+    }
+    const minBtn = root.querySelector('#ux-btn-minimize');
+    if (minBtn) {
+      minBtn.setAttribute('data-tooltip', s.minimized ? 'Expand (Alt+U)' : 'Minimize (Alt+U)');
     }
     if (s.floating) {
       root.classList.add('ux-floating');
@@ -612,6 +608,11 @@ async function setPanelCollapsed(collapsed, options = {}) {
 
   const { persist = true, resetViews = true } = options;
   root.classList.toggle('ux-minimized', collapsed);
+
+  const minBtn = root.querySelector('#ux-btn-minimize');
+  if (minBtn) {
+    minBtn.setAttribute('data-tooltip', collapsed ? 'Expand (Alt+U)' : 'Minimize (Alt+U)');
+  }
 
   if (resetViews && collapsed) {
     root.classList.remove('ux-settings-open');
@@ -1216,7 +1217,7 @@ function getSidebarHTML() {
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </button>
-        <button class="ux-icn" id="ux-btn-minimize" aria-label="Minimize" data-tooltip="Minimize">
+        <button class="ux-icn" id="ux-btn-minimize" aria-label="Minimize" data-tooltip="Minimize (Alt+U)">
           <svg class="ux-icon-minimize" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"/>
           </svg>
@@ -1329,6 +1330,9 @@ function getSidebarHTML() {
       </button>
       <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-reset">Reset local stats</button>
       <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-clear-debug">Clear debug logs</button>
+    </div>
+    <div class="ux-shortcut-footer">
+      Press <kbd>Alt</kbd>+<kbd>U</kbd> to toggle panel
     </div>
   </div>
 
@@ -1804,10 +1808,27 @@ function getCSS() {
   padding: 7px 0; border-bottom: 1px solid var(--ux-border-subtle);
 }
 .ux-setting-label { font-size: 13px; font-weight: 500; color: var(--ux-text-2); }
-.ux-shortcut-note {
-  padding: 8px 0 2px;
+.ux-shortcut-footer {
+  margin-top: 16px;
   font-size: 11px;
   color: var(--ux-text-3);
+  text-align: center;
+  user-select: none;
+}
+.ux-shortcut-footer kbd {
+  background: #282828;
+  border: 1px solid #3c3c3c;
+  border-bottom: 2px solid #3c3c3c;
+  border-radius: 4px;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  color: var(--ux-text-2);
+  display: inline-block;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  padding: 1.5px 5px;
+  margin: 0 2px;
 }
 .ux-toggle { position: relative; width: 32px; height: 18px; flex-shrink: 0; }
 .ux-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
