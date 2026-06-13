@@ -1278,17 +1278,7 @@ function getSidebarHTML() {
       <div class="ux-time" id="ux-peak-time"></div>
     </div>
 
-    <div class="ux-action-row">
-      <button class="ux-act-btn" id="ux-btn-export">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span id="ux-export-label">Export JSON</span>
-        <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
-      </button>
-      <button class="ux-act-btn" id="ux-btn-debug">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <span id="ux-debug-count">0 logs</span>
-      </button>
-    </div>
+
   </div>
 
   <div id="ux-settings-panel">
@@ -1330,6 +1320,13 @@ function getSidebarHTML() {
     </div>
     <button class="ux-advanced-btn" id="ux-advanced-btn">Advanced</button>
     <div class="ux-settings-btns">
+      <button class="ux-settings-btn" id="ux-btn-export">
+        <span id="ux-export-label">Export JSON data</span>
+        <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
+      </button>
+      <button class="ux-settings-btn" id="ux-btn-debug">
+        View debug viewer (<span id="ux-debug-count">0 logs</span>)
+      </button>
       <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-reset">Reset local stats</button>
       <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-clear-debug">Clear debug logs</button>
     </div>
@@ -1497,8 +1494,7 @@ function getCSS() {
   border: 1px solid rgba(255,255,255,0.08);
 }
 #usagex-v2-root.ux-minimized #ux-bars-section,
-#usagex-v2-root.ux-minimized #ux-peak-strip-wrap,
-#usagex-v2-root.ux-minimized .ux-action-row { display: none; }
+#usagex-v2-root.ux-minimized #ux-peak-strip-wrap { display: none; }
 #usagex-v2-root.ux-minimized .ux-header { margin-bottom: 0; }
 .ux-icon-expand { display: none; }
 #usagex-v2-root.ux-minimized .ux-icon-minimize { display: none; }
@@ -1771,26 +1767,6 @@ function getCSS() {
   margin-top: 4px;
   font-style: italic;
 }
-.ux-action-row { display: flex; gap: 8px; margin-top: 12px; }
-.ux-act-btn {
-  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
-  padding: 5px 10px; background: #1a1a1a;
-  border: 1px solid #333; border-radius: 6px;
-  font-size: 11px; color: #aaa; cursor: pointer;
-  font-family: var(--ux-font); font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
-  position: relative;
-}
-.ux-act-btn:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--ux-text-2);
-}
-.ux-act-btn:active {
-  background: rgba(255, 255, 255, 0.15);
-  color: var(--ux-text-1);
-  transform: scale(0.97);
-  transition-duration: 0.08s;
-}
 .ux-export-chip {
   display: none;
   font-size: 12px;
@@ -1801,17 +1777,10 @@ function getCSS() {
 .ux-export-chip.ux-chip-visible {
   display: inline;
 }
-.ux-act-btn:focus-visible {
-  outline: 2px solid var(--ux-accent-dim);
-  outline-offset: 2px;
-}
 .ux-settings-btn:focus-visible {
   outline: 2px solid var(--ux-accent-dim);
   outline-offset: 2px;
 }
-.ux-act-btn svg { flex-shrink: 0; transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
-.ux-act-btn:hover svg { transform: translateY(-1px) scale(1.12); }
-.ux-act-btn:active svg { transform: scale(0.9); transition-duration: 0.1s; }
 .ux-settings-header {
   display: flex; align-items: center; gap: 8px;
   font-size: 13px; font-weight: 600; color: var(--ux-text-1);
