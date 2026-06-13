@@ -858,9 +858,9 @@ function getPeakClockIST() {
   return { h: ist.getHours(), m: ist.getMinutes(), dayOfWeek: ist.getDay() };
 }
 
-function buildPeakClockSVG() {
-  const ns = 'http://www.w3.org/2000/svg';
-  const cx = 44, cy = 44, R = 36;
+function updatePeakClock() {
+  const root = document.getElementById(UX_ID);
+  if (!root) return;
 
   const { h, m, dayOfWeek } = getPeakClockIST();
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
@@ -868,128 +868,71 @@ function buildPeakClockSVG() {
   // Current time as fractional hours (0-24)
   const curH = h + m / 60;
 
-  // Peak zone: 18:30 to 24:30 (= next day 0:30)
-  // On the 24-h dial: 18.5h to 24.5h, but we wrap 24.5 → 0.5
-  // Arc colour
-  const arcColor = isWeekend ? '#555555' : '#ef4444';
+  // Peak zone: 18:30 to 24:30 (= next day 0:30), grey on weekends
+  const zoneColor = isWeekend ? '#555555' : 'var(--ux-red)';
 
-  // Tooltip
   const inPeak = !isWeekend && (curH >= 18.5 || curH < 0.5);
-  const tooltip = inPeak
-    ? 'Peak hours (6:30 PM\u20131 2:30 AM IST) \u2014 Claude limits deplete faster'
+
+  // Current time, formatted for display (e.g. "5:55 PM")
+  const h12 = h % 12 || 12;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const timeStr = `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+
+  // Short status message for the always-visible line
+  const statusMsg = inPeak
+    ? 'Peak \u2014 limits deplete faster'
     : 'Off-peak \u2014 good time to use Claude';
 
-  function angleForH(fh) {
-    // 0h (midnight) at top = -90°, clockwise, 360° = 24h
-    return (fh / 24) * 360 - 90;
+  // Fuller message for the hover tooltip
+  const tooltip = inPeak
+    ? 'Peak hours (6:30 PM\u201312:30 AM IST) \u2014 Claude limits deplete faster'
+    : isWeekend
+      ? 'Weekends are off-peak \u2014 good time to use Claude'
+      : 'Off-peak \u2014 good time to use Claude';
+
+  // Peak zone split into two strip segments to handle the midnight wrap:
+  // 18.5 -> 24 and 0 -> 0.5
+  const zoneA = root.querySelector('#ux-peak-zone-a');
+  const zoneB = root.querySelector('#ux-peak-zone-b');
+  if (zoneA && zoneB) {
+    zoneA.style.left = `${(18.5 / 24) * 100}%`;
+    zoneA.style.width = `${((24 - 18.5) / 24) * 100}%`;
+    zoneA.style.background = zoneColor;
+    zoneB.style.left = '0%';
+    zoneB.style.width = `${(0.5 / 24) * 100}%`;
+    zoneB.style.background = zoneColor;
   }
 
-  function polarPt(angleDeg, r) {
-    const rad = angleDeg * Math.PI / 180;
-    return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
+  // Current time marker position along the 24h strip
+  const nowMarker = root.querySelector('#ux-peak-now');
+  if (nowMarker) nowMarker.style.left = `${(curH / 24) * 100}%`;
+
+  // Status label
+  const statusEl = root.querySelector('#ux-peak-status');
+  if (statusEl) {
+    statusEl.textContent = inPeak ? 'Peak' : 'Off-peak';
+    statusEl.classList.remove('ux-peak-status-peak', 'ux-peak-status-off');
+    statusEl.classList.add(inPeak ? 'ux-peak-status-peak' : 'ux-peak-status-off');
   }
 
-  function arcPath(startH, endH, r) {
-    // Draw arc from startH to endH (hours, 0-24), on circle of radius r
-    const a1 = angleForH(startH);
-    const a2 = angleForH(endH);
-    const p1 = polarPt(a1, r);
-    const p2 = polarPt(a2, r);
-    const delta = ((endH - startH) + 24) % 24;
-    const largeArc = delta > 12 ? 1 : 0;
-    return `M ${p1.x.toFixed(3)} ${p1.y.toFixed(3)} A ${r} ${r} 0 ${largeArc} 1 ${p2.x.toFixed(3)} ${p2.y.toFixed(3)}`;
-  }
+  // WEEKEND badge + 7-day popup, shown only on Sat/Sun
+  const weekendBadge = root.querySelector('#ux-weekend-badge');
+  if (weekendBadge) weekendBadge.style.display = isWeekend ? 'inline-block' : 'none';
 
-  const svgEl = document.getElementById('ux-peak-clock');
-  if (!svgEl) return;
+  // Mark today's column in the 7-day popup (0 = Mon ... 6 = Sun)
+  const todayIdx = (dayOfWeek + 6) % 7;
+  root.querySelectorAll('#ux-week-popup .ux-week-day').forEach((el) => {
+    const idx = parseInt(el.getAttribute('data-day'), 10);
+    el.classList.toggle('ux-week-day-today', idx === todayIdx);
+  });
 
-  // Clear existing
-  while (svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+  // Always-visible line: current time and short status
+  const timeEl = root.querySelector('#ux-peak-time');
+  if (timeEl) timeEl.textContent = `${timeStr} \u00b7 ${statusMsg}`;
 
-  function mk(tag, attrs) {
-    const el = document.createElementNS(ns, tag);
-    for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-    return el;
-  }
-
-  // Background circle
-  svgEl.appendChild(mk('circle', { cx, cy, r: R + 4, fill: '#1a1a1a' }));
-
-  // Ring
-  svgEl.appendChild(mk('circle', { cx, cy, r: R, fill: 'none', stroke: '#333', 'stroke-width': '1.2' }));
-
-  // Hour ticks
-  for (let i = 0; i < 24; i++) {
-    const ang = angleForH(i);
-    const isMajor = i % 6 === 0;
-    const inner = isMajor ? R - 5 : R - 3;
-    const outer = R;
-    const p1 = polarPt(ang, inner);
-    const p2 = polarPt(ang, outer);
-    svgEl.appendChild(mk('line', {
-      x1: p1.x.toFixed(2), y1: p1.y.toFixed(2),
-      x2: p2.x.toFixed(2), y2: p2.y.toFixed(2),
-      stroke: isMajor ? '#666' : '#3a3a3a',
-      'stroke-width': isMajor ? '1.2' : '0.7',
-      'stroke-linecap': 'round'
-    }));
-
-    // Labels at 0, 6, 12, 18
-    if (isMajor) {
-      const labelR = R - 10;
-      const lp = polarPt(ang, labelR);
-      const labels = { 0: '12', 6: '6', 12: '12', 18: '18' };
-      const txt = mk('text', {
-        x: lp.x.toFixed(2), y: lp.y.toFixed(2),
-        'text-anchor': 'middle',
-        'dominant-baseline': 'central',
-        fill: '#555',
-        'font-size': '7',
-        'font-family': 'inherit'
-      });
-      txt.textContent = labels[i];
-      svgEl.appendChild(txt);
-    }
-  }
-
-  // Peak arc (18:30 → 24:30, i.e. 0:30 next day wrapping)
-  // Split into two arcs: 18.5 → 24 and 0 → 0.5 to handle the midnight wrap
-  const arcPath1 = arcPath(18.5, 24, R);
-  const arcPath2 = arcPath(0, 0.5, R);
-  svgEl.appendChild(mk('path', {
-    d: arcPath1,
-    fill: 'none',
-    stroke: arcColor,
-    'stroke-width': '4',
-    'stroke-linecap': 'round'
-  }));
-  svgEl.appendChild(mk('path', {
-    d: arcPath2,
-    fill: 'none',
-    stroke: arcColor,
-    'stroke-width': '4',
-    'stroke-linecap': 'round'
-  }));
-
-  // Current time dot
-  const dotAng = angleForH(curH);
-  const dp = polarPt(dotAng, R);
-  svgEl.appendChild(mk('circle', {
-    cx: dp.x.toFixed(3),
-    cy: dp.y.toFixed(3),
-    r: '3.5',
-    fill: '#ffffff',
-    'stroke': '#1a1a1a',
-    'stroke-width': '1'
-  }));
-
-  // Update tooltip on wrapper
-  const wrap = document.getElementById('ux-peak-clock-wrap');
-  if (wrap) wrap.setAttribute('data-tooltip', tooltip);
-}
-
-function updatePeakClock() {
-  buildPeakClockSVG();
+  // Fuller explanation on hover
+  const track = root.querySelector('#ux-peak-track');
+  if (track) track.setAttribute('data-tooltip', tooltip);
 }
 
 function setEl(sel, text) {
@@ -1288,8 +1231,35 @@ function getSidebarHTML() {
       </div>
     </div>
 
-    <div id="ux-peak-clock-wrap" data-tooltip="">
-      <svg id="ux-peak-clock" width="88" height="88" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-label="Peak hours clock"></svg>
+    <div class="ux-bar-item" id="ux-peak-strip-wrap">
+      <div class="ux-bar-top">
+        <span class="ux-bar-label">Peak hours</span>
+        <span class="ux-peak-status-group">
+          <span class="ux-weekend-badge" id="ux-weekend-badge">
+            WEEKEND
+            <div class="ux-week-popup" id="ux-week-popup">
+              <div class="ux-week-popup-row">
+                <span class="ux-week-day ux-week-day-peak" data-day="0"></span>
+                <span class="ux-week-day ux-week-day-peak" data-day="1"></span>
+                <span class="ux-week-day ux-week-day-peak" data-day="2"></span>
+                <span class="ux-week-day ux-week-day-peak" data-day="3"></span>
+                <span class="ux-week-day ux-week-day-peak" data-day="4"></span>
+                <span class="ux-week-day" data-day="5"></span>
+                <span class="ux-week-day" data-day="6"></span>
+              </div>
+              <div class="ux-week-popup-labels"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+              <div class="ux-week-popup-caption">Peak hours apply Mon\u2013Fri only</div>
+            </div>
+          </span>
+          <span class="ux-peak-status" id="ux-peak-status">—</span>
+        </span>
+      </div>
+      <div class="ux-peak-track" id="ux-peak-track" data-tooltip="">
+        <div class="ux-peak-zone" id="ux-peak-zone-a"></div>
+        <div class="ux-peak-zone" id="ux-peak-zone-b"></div>
+        <div class="ux-peak-now" id="ux-peak-now"></div>
+      </div>
+      <div class="ux-time" id="ux-peak-time"></div>
     </div>
 
     <div class="ux-action-row">
@@ -1879,28 +1849,140 @@ function getCSS() {
   color: #ff8888;
   transform: scale(0.98);
 }
-#ux-peak-clock-wrap {
-  display: flex;
-  justify-content: center;
+#ux-peak-strip-wrap {
   margin-top: 10px;
-  position: relative;
-  cursor: default;
 }
-#ux-peak-clock-wrap[data-tooltip]::after {
+.ux-peak-track {
+  position: relative;
+  height: 6px;
+  background: #282828;
+  border-radius: 3px;
+  margin-bottom: 5px;
+  overflow: visible;
+  cursor: help;
+}
+.ux-peak-zone {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  background: var(--ux-red);
+  opacity: 0.8;
+  border-radius: 3px;
+  pointer-events: none;
+}
+.ux-peak-now {
+  position: absolute;
+  top: -4px;
+  left: 0%;
+  width: 2px;
+  height: 14px;
+  background: var(--ux-accent);
+  border-radius: 1px;
+  transform: translateX(-1px);
+  transition: left 1s linear;
+  pointer-events: none;
+}
+.ux-peak-now::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ux-accent);
+  box-shadow: 0 0 0 2px var(--ux-surface);
+}
+.ux-peak-status {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ux-text-2);
+}
+#usagex-v2-root .ux-peak-track[data-tooltip]::after {
   top: auto;
   bottom: calc(100% + 7px);
   transform: translateX(-50%) translateY(3px);
   white-space: normal !important;
-  max-width: 180px;
+  max-width: 200px;
   text-align: center;
 }
-#ux-peak-clock-wrap[data-tooltip]:hover::after {
+#usagex-v2-root .ux-peak-track[data-tooltip]:hover::after {
   transform: translateX(-50%) translateY(0);
 }
-#ux-peak-clock {
-  display: block;
-  border-radius: 50%;
-  overflow: visible;
+.ux-peak-status-peak { color: var(--ux-red) !important; }
+.ux-peak-status-off  { color: var(--ux-green-bright) !important; }
+.ux-peak-status-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ux-weekend-badge {
+  position: relative;
+  display: none;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--ux-text-3);
+  border: 1px solid var(--ux-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  cursor: help;
+}
+.ux-week-popup {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  right: 0;
+  width: 150px;
+  background: rgba(26, 26, 26, 0.95);
+  border: 1px solid #333;
+  border-radius: 6px;
+  padding: 8px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+.ux-weekend-badge:hover .ux-week-popup {
+  opacity: 1;
+  visibility: visible;
+}
+.ux-week-popup-row {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.ux-week-day {
+  flex: 1;
+  height: 14px;
+  border-radius: 3px;
+  background: #555555;
+}
+.ux-week-day-peak {
+  background: var(--ux-red);
+  opacity: 0.85;
+}
+.ux-week-day-today {
+  outline: 1px solid var(--ux-accent);
+  outline-offset: 1px;
+}
+.ux-week-popup-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: var(--ux-text-4);
+  margin-bottom: 4px;
+  padding: 0 1px;
+}
+.ux-week-popup-caption {
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--ux-text-3);
+  line-height: 1.4;
+  text-align: center;
 }
   `;
 }
