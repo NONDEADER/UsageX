@@ -920,6 +920,17 @@ function updatePeakClock() {
     statusEl.classList.add(inPeak ? 'ux-peak-status-peak' : 'ux-peak-status-off');
   }
 
+  // Live pulsing dot in header (minimized state indicators)
+  const liveDot = root.querySelector('#ux-live-dot');
+  if (liveDot) {
+    liveDot.classList.remove('ux-live-dot-peak', 'ux-live-dot-off');
+    liveDot.classList.add(inPeak ? 'ux-live-dot-peak' : 'ux-live-dot-off');
+    const wrapEl = liveDot.closest('.ux-title-icon-wrap');
+    if (wrapEl) {
+      wrapEl.setAttribute('data-tooltip', inPeak ? 'Peak hours (limits deplete faster)' : 'Off-peak hours (good time to use)');
+    }
+  }
+
   // WEEKEND badge + 7-day popup, shown only on Sat/Sun
   const weekendBadge = root.querySelector('#ux-weekend-badge');
   if (weekendBadge) weekendBadge.style.display = isWeekend ? 'inline-block' : 'none';
@@ -1486,6 +1497,7 @@ function getCSS() {
   border: 1px solid rgba(255,255,255,0.08);
 }
 #usagex-v2-root.ux-minimized #ux-bars-section,
+#usagex-v2-root.ux-minimized #ux-peak-strip-wrap,
 #usagex-v2-root.ux-minimized .ux-action-row { display: none; }
 #usagex-v2-root.ux-minimized .ux-header { margin-bottom: 0; }
 .ux-icon-expand { display: none; }
@@ -1562,9 +1574,25 @@ function getCSS() {
   box-shadow: 0 0 0 1.5px var(--ux-surface);
   animation: ux-pulse 3s ease-in-out infinite;
 }
+.ux-dot.ux-live-dot-peak::before {
+  background: var(--ux-red);
+  animation: ux-pulse-red 2s ease-in-out infinite;
+}
+.ux-dot.ux-live-dot-off::before {
+  background: var(--ux-green-bright);
+  animation: ux-pulse-green 3s ease-in-out infinite;
+}
 @keyframes ux-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.3; }
+}
+@keyframes ux-pulse-red {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 1.5px var(--ux-surface), 0 0 4px var(--ux-red); }
+  50% { opacity: 0.4; box-shadow: 0 0 0 1.5px var(--ux-surface), 0 0 0px var(--ux-red); }
+}
+@keyframes ux-pulse-green {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 1.5px var(--ux-surface), 0 0 3px var(--ux-green-bright); }
+  50% { opacity: 0.4; box-shadow: 0 0 0 1.5px var(--ux-surface), 0 0 0px var(--ux-green-bright); }
 }
 .ux-name { font-size: 13px; font-weight: 600; color: var(--ux-text-1); letter-spacing: 0.01em; }
 /* ── Claude-style tooltips ── */
@@ -1601,6 +1629,18 @@ function getCSS() {
 #usagex-v2-root [data-tooltip]:hover::after {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+/* Align title icon tooltip to the left so it doesn't overflow the screen edge */
+#usagex-v2-root .ux-title-icon-wrap[data-tooltip]::after {
+  left: 0;
+  transform: translateY(-3px);
+}
+#usagex-v2-root .ux-title-icon-wrap[data-tooltip]:hover::after {
+  transform: translateY(0);
+}
+/* Only show the tooltip when the panel is minimized */
+#usagex-v2-root:not(.ux-minimized) .ux-title-icon-wrap[data-tooltip]::after {
+  display: none !important;
 }
 #usagex-v2-root #ux-rate-dot[data-tooltip]::after {
   top: auto;
