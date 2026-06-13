@@ -1236,7 +1236,7 @@ function getSidebarHTML() {
       </div>
     </div>
 
-    <div class="ux-bar-item" id="ux-peak-strip-wrap">
+    <div id="ux-peak-strip-wrap">
       <div class="ux-bar-top">
         <span class="ux-bar-label">Peak hours</span>
         <span class="ux-peak-status-group">
@@ -1855,7 +1855,11 @@ function getCSS() {
   transform: scale(0.98);
 }
 #ux-peak-strip-wrap {
-  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 14px;
+  padding: 12px 2px 4px 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 .ux-peak-track {
   position: relative;
