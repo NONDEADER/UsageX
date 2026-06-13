@@ -703,7 +703,12 @@ async function updateUI() {
     const cfg = rateConfig[usageRateState] || rateConfig.gray;
     rateDotEl.className = 'ux-rate-dot ' + cfg.cls;
     rateDotEl.textContent = '';
-    rateDotEl.setAttribute('data-tooltip', cfg.label);
+    
+    let tooltipText = cfg.label;
+    if (sessionPct != null && Number(sessionPct) >= 100) {
+      tooltipText = 'Usage limit fully reached';
+    }
+    rateDotEl.setAttribute('data-tooltip', tooltipText);
   }
 
   const sessionTrack = root.querySelector('#ux-session-track');
