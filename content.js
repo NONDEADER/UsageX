@@ -1500,9 +1500,9 @@ function getCSS() {
 #usagex-v2-root.ux-minimized #ux-bars-section,
 #usagex-v2-root.ux-minimized #ux-peak-strip-wrap { display: none; }
 #usagex-v2-root.ux-minimized .ux-header { margin-bottom: 0; }
-.ux-icon-expand { display: none; }
-#usagex-v2-root.ux-minimized .ux-icon-minimize { display: none; }
-#usagex-v2-root.ux-minimized .ux-icon-expand  { display: block; }
+#usagex-v2-root .ux-icon-expand { display: none !important; }
+#usagex-v2-root.ux-minimized .ux-icon-minimize { display: none !important; }
+#usagex-v2-root.ux-minimized .ux-icon-expand  { display: block !important; }
 .ux-minimized-badge {
   display: none;
   font-size: 10px;
