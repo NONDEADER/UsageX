@@ -134,7 +134,7 @@ function freshToday() {
 }
 
 
-function defaultSettings() { return { debug_logging: false, sidebar_side: 'left', timezone: 'auto', floating: false, float_x: null, float_y: null, floating_opacity_enabled: true, floating_opacity: 0.85, minimized: false }; }
+function defaultSettings() { return { debug_logging: false, sidebar_side: 'left', timezone: 'auto', floating: false, float_x: null, float_y: null, floating_opacity_enabled: true, floating_opacity: 0.85, minimized: false, resizable: false, float_width: null, float_height: null }; }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function setupSidebarResizeObserver(root) {
@@ -270,7 +270,7 @@ function formatWeeklyResetDisplay(timestamp, timezone) {
     } else if (hoursLeft === 0) { remaining = `${minutesLeft}m remaining`; }
     else { remaining = `${hoursLeft}h ${minutesLeft}m remaining`; }
   }
-  return `${remaining} · resets ${date} ${month}, ${day} at ${timeStr}`;
+  return `${remaining} · resets ${day}, ${month} ${date} · ${timeStr}`;
 }
 
 // ─── Fetch interception (via injected MAIN-world script) ──────────────────────
@@ -513,7 +513,7 @@ async function injectSidebar() {
     }
     if (s.floating) {
       root.classList.add('ux-floating');
-      const fx = s.float_x != null ? s.float_x : window.innerWidth - 240;
+      const fx = s.float_x != null ? s.float_x : window.innerWidth - 266;
       const fy = s.float_y != null ? s.float_y : window.innerHeight - 200;
       root.style.left = fx + 'px';
       root.style.top  = fy + 'px';
@@ -937,6 +937,33 @@ async function updateUI() {
   } else {
     root.style.setProperty('--ux-floating-opacity', '1');
   }
+
+  const isResizable = settings.resizable === true && isFloating;
+  const resizeRow = root.querySelector('#ux-resize-row');
+  if (resizeRow) {
+    resizeRow.style.display = isFloating ? 'flex' : 'none';
+  }
+  const resizeToggle = root.querySelector('#ux-setting-resize');
+  if (resizeToggle) {
+    resizeToggle.checked = settings.resizable === true;
+  }
+  const rHandleLeft = root.querySelector('#ux-resize-handle-left');
+  const rHandleRight = root.querySelector('#ux-resize-handle-right');
+  if (rHandleLeft && rHandleRight) {
+    rHandleLeft.style.display = isResizable ? 'block' : 'none';
+    rHandleRight.style.display = isResizable ? 'block' : 'none';
+  }
+
+  root.style.height = ''; // Always keep height auto to avoid ugly black gaps
+  if (isResizable && !root.classList.contains('ux-minimized')) {
+    if (settings.float_width) root.style.width = settings.float_width + 'px';
+  } else {
+    if (isFloating) {
+      root.style.width = '250px';
+    } else {
+      root.style.width = '';
+    }
+  }
   updatePeakClock();
 }
 
@@ -1187,7 +1214,7 @@ function bindEvents() {
     if (enable) {
       // Move from sidebar into body as floating panel
       const s = await getSettings();
-      const fx = s.float_x != null ? s.float_x : window.innerWidth - 240;
+      const fx = s.float_x != null ? s.float_x : window.innerWidth - 266;
       const fy = s.float_y != null ? s.float_y : window.innerHeight - 200;
       root.style.left = fx + 'px';
       root.style.top  = fy + 'px';
@@ -1266,6 +1293,72 @@ function bindEvents() {
 
     document.addEventListener('mousemove', dragMoveHandler);
     document.addEventListener('mouseup', dragUpHandler);
+  }
+
+  root.querySelector('#ux-setting-resize')?.addEventListener('change', async (e) => {
+    const enable = e.target.checked;
+    await saveSettings({ resizable: enable });
+    updateUI().catch(() => {});
+  });
+
+  const handleLeft = root.querySelector('#ux-resize-handle-left');
+  const handleRight = root.querySelector('#ux-resize-handle-right');
+
+  if (handleLeft && handleRight) {
+    let resizing = false;
+    let resizeSide = null; // 'left' | 'right'
+    let startWidth = 0;
+    let startX = 0;
+    let startLeft = 0;
+
+    const onMouseDown = (e, side) => {
+      if (!root.classList.contains('ux-floating')) return;
+      resizing = true;
+      resizeSide = side;
+      startWidth = root.offsetWidth;
+      startX = e.clientX;
+      startLeft = parseFloat(root.style.left) || root.getBoundingClientRect().left;
+      
+      root.style.transition = 'none';
+      const handle = side === 'left' ? handleLeft : handleRight;
+      handle.classList.add('ux-resizing-active');
+      
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    handleLeft.addEventListener('mousedown', (e) => onMouseDown(e, 'left'));
+    handleRight.addEventListener('mousedown', (e) => onMouseDown(e, 'right'));
+
+    const onMouseMove = (e) => {
+      if (!resizing) return;
+      let newWidth = startWidth;
+      if (resizeSide === 'left') {
+        const deltaX = e.clientX - startX;
+        newWidth = Math.max(220, Math.min(500, startWidth - deltaX));
+        const actualDeltaX = startWidth - newWidth;
+        root.style.left = (startLeft + actualDeltaX) + 'px';
+      } else {
+        const deltaX = e.clientX - startX;
+        newWidth = Math.max(220, Math.min(500, startWidth + deltaX));
+      }
+      root.style.width = newWidth + 'px';
+    };
+
+    const onMouseUp = async () => {
+      if (!resizing) return;
+      resizing = false;
+      root.style.transition = '';
+      handleLeft.classList.remove('ux-resizing-active');
+      handleRight.classList.remove('ux-resizing-active');
+      
+      const w = parseInt(root.style.width, 10);
+      const l = parseInt(root.style.left, 10);
+      await saveSettings({ float_width: w, float_x: l });
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
   }
 }
 
@@ -1431,6 +1524,14 @@ function getSidebarHTML() {
           </div>
         </div>
         
+        <div class="ux-setting-row ux-setting-row-sub" id="ux-resize-row" style="display: none;">
+          <span class="ux-setting-label">Enable resizing</span>
+          <label class="ux-toggle">
+            <input type="checkbox" id="ux-setting-resize">
+            <span class="ux-toggle-track"></span>
+          </label>
+        </div>
+        
         <div class="ux-setting-row" id="ux-sidebar-side-row">
           <span class="ux-setting-label">Sidebar side</span>
           <div class="ux-csel" id="ux-side-select">
@@ -1510,7 +1611,7 @@ function getSidebarHTML() {
           <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
         </button>
         <button class="ux-settings-btn ux-btn-with-badge" id="ux-btn-debug">
-          <span>Debug viewer</span>
+          <span>Debug logs</span>
           <span class="ux-count-badge" id="ux-debug-count">0</span>
         </button>
       </div>
@@ -1524,7 +1625,8 @@ function getSidebarHTML() {
       Press <kbd>Alt</kbd>+<kbd>U</kbd> to toggle panel
     </div>
   </div>
-
+  <div id="ux-resize-handle-left" class="ux-resize-edge-handle ux-resize-edge-left" style="display: none;"></div>
+  <div id="ux-resize-handle-right" class="ux-resize-edge-handle ux-resize-edge-right" style="display: none;"></div>
 </div>`;
 }
 
@@ -1565,7 +1667,7 @@ function getCSS() {
 #usagex-v2-root.ux-floating {
   position: fixed;
   z-index: 2147483647;
-  width: 224px;
+  width: 250px;
   border-top: none;
   border-radius: 12px;
   background: #222222;
@@ -1636,7 +1738,7 @@ function getCSS() {
   bottom: 28px;
   right: 18px;
   z-index: 99999;
-  width: 224px;
+  width: 250px;
   border-top: none;
   border-radius: 12px;
   background: #222222;
@@ -1881,7 +1983,7 @@ function getCSS() {
   display: flex; justify-content: space-between;
   align-items: baseline; margin-bottom: 6px;
 }
-.ux-bar-label { font-size: 14px; color: var(--ux-text-1); font-weight: 600; }
+.ux-bar-label { font-size: 14px; color: var(--ux-text-1); font-weight: 600; white-space: nowrap; }
 .ux-pct-wrap {
   display: inline-flex;
   align-items: center;
@@ -2145,9 +2247,10 @@ function getCSS() {
   width: 100%; padding: 7px 0; background: rgba(255, 255, 255, 0.05);
   border: none; border-radius: var(--ux-radius);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), 0 1px 2px rgba(0, 0, 0, 0.15);
-  font-size: 12px; color: var(--ux-text-2); cursor: pointer;
+  font-size: 11.5px; color: var(--ux-text-2); cursor: pointer;
   font-family: var(--ux-font); font-weight: 500;
   transition: background 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
 }
 .ux-settings-btn:hover { background: rgba(255, 255, 255, 0.1); color: var(--ux-text-1); }
 .ux-settings-btn.ux-btn-destructive {
@@ -2219,6 +2322,7 @@ function getCSS() {
   font-weight: 600;
   letter-spacing: -0.01em;
   color: var(--ux-text-2);
+  white-space: nowrap;
 }
 #usagex-v2-root .ux-peak-track[data-tooltip]::after {
   top: auto;
@@ -2301,6 +2405,41 @@ function getCSS() {
   color: var(--ux-text-3);
   line-height: 1.4;
   text-align: center;
+}
+.ux-resize-edge-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 2147483647;
+  background: transparent;
+}
+.ux-resize-edge-left {
+  left: -4px;
+}
+.ux-resize-edge-right {
+  right: -4px;
+}
+.ux-resize-edge-handle::after {
+  content: "";
+  position: absolute;
+  top: 15%;
+  bottom: 15%;
+  width: 2px;
+  background: var(--ux-accent);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.ux-resize-edge-left::after {
+  left: 3px;
+}
+.ux-resize-edge-right::after {
+  right: 3px;
+}
+.ux-resize-edge-handle:hover::after,
+.ux-resize-edge-handle.ux-resizing-active::after {
+  opacity: 0.6;
 }
   `;
 }
