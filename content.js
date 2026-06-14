@@ -161,6 +161,41 @@ function setupSidebarResizeObserver(root) {
 
 // ─── Timezone helpers ──────────────────────────────────────────────────────────
 
+const TZ_MAP = {
+  'HST': 'Pacific/Honolulu',
+  'AKST': 'America/Anchorage',
+  'PST': 'America/Los_Angeles',
+  'MST': 'America/Denver',
+  'CST': 'America/Chicago',
+  'EST': 'America/New_York',
+  'AST': 'America/Halifax',
+  'BRT': 'America/Sao_Paulo',
+  'GMT': 'Etc/GMT',
+  'CET': 'Europe/Paris',
+  'EET': 'Europe/Athens',
+  'MSK': 'Europe/Moscow',
+  'GST': 'Asia/Dubai',
+  'PKT': 'Asia/Karachi',
+  'IST': 'Asia/Kolkata',
+  'NPT': 'Asia/Kathmandu',
+  'BST': 'Asia/Dhaka',
+  'ICT': 'Asia/Bangkok',
+  'CST-Asia': 'Asia/Shanghai',
+  'SGT': 'Asia/Singapore',
+  'JST': 'Asia/Tokyo',
+  'KST': 'Asia/Seoul',
+  'ACST': 'Australia/Darwin',
+  'AEST': 'Australia/Sydney',
+  'NZST': 'Pacific/Auckland'
+};
+
+function getIANATimezone(timezone) {
+  if (!timezone || timezone === 'auto') {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  }
+  return TZ_MAP[timezone] || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
 function getTimezoneName() {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -182,9 +217,11 @@ function formatResetTimeDisplay(timestamp, timezone) {
   const diff = timestamp - Date.now();
   if (diff <= 0) return 'resetting now';
   const resetDate = new Date(timestamp);
+  const ianaTz = getIANATimezone(timezone);
   const timeStr = resetDate.toLocaleTimeString([], { 
     hour: '2-digit', 
-    minute: '2-digit' 
+    minute: '2-digit',
+    timeZone: ianaTz
   });
   const hoursLeft = Math.floor(diff / (1000 * 60 * 60));
   const minutesLeft = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
@@ -203,15 +240,24 @@ function formatResetTimeDisplay(timestamp, timezone) {
 function formatWeeklyResetDisplay(timestamp, timezone) {
   if (!timestamp) return '-';
   const resetDate = new Date(timestamp);
-  const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const day = dayNames[resetDate.getDay()];
-  const date = resetDate.getDate();
-  const month = monthNames[resetDate.getMonth()];
-  const timeStr = resetDate.toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit' 
+  const ianaTz = getIANATimezone(timezone);
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: ianaTz
   });
+  const parts = formatter.formatToParts(resetDate);
+  const day = parts.find(p => p.type === 'weekday')?.value || '';
+  const date = parts.find(p => p.type === 'day')?.value || '';
+  const month = parts.find(p => p.type === 'month')?.value || '';
+  const hour = parts.find(p => p.type === 'hour')?.value || '';
+  const minute = parts.find(p => p.type === 'minute')?.value || '';
+  const dayPeriod = parts.find(p => p.type === 'dayPeriod')?.value || '';
+  const timeStr = `${hour}:${minute} ${dayPeriod}`;
+
   const diff = timestamp - Date.now();
   let remaining;
   if (diff <= 0) { remaining = 'resetting now'; }
@@ -798,7 +844,7 @@ async function updateUI() {
   const dbgRes = await browser.storage.local.get('debug_logs');
   const debugLogs = dbgRes.debug_logs || [];
   const dbgCount = debugLogs.length;
-  setEl('#ux-debug-count', `${dbgCount} logs`);
+  setEl('#ux-debug-count', `${dbgCount}`);
 
   const sessionRemainingEstimate = estimateMessagesRemaining(sessionPct, usage_limits?.session_resets_at, debugLogs);
   // Fold messages-remaining into the session track tooltip instead of a separate line
@@ -820,12 +866,33 @@ async function updateUI() {
 
   // Settings panel state
   const dbgToggle  = root.querySelector('#ux-setting-debug');
-  const sideSelect = root.querySelector('#ux-setting-side');
-  const tzSelect   = root.querySelector('#ux-setting-timezone');
   const floatToggle = root.querySelector('#ux-setting-float');
   if (dbgToggle)   dbgToggle.checked   = settings.debug_logging !== false;
-  if (sideSelect)  sideSelect.value    = settings.sidebar_side || 'left';
-  if (tzSelect)    tzSelect.value      = settings.timezone || 'auto';
+
+  // Update custom sidebar side dropdown label
+  const currentSide = settings.sidebar_side || 'left';
+  const sideLabel = root.querySelector('#ux-side-label');
+  const sideDropdownEl = root.querySelector('#ux-side-dropdown');
+  if (sideLabel && sideDropdownEl) {
+    const activeSideOpt = sideDropdownEl.querySelector(`.ux-csel-option[data-value="${currentSide}"]`);
+    if (activeSideOpt) {
+      sideLabel.textContent = activeSideOpt.textContent;
+      sideDropdownEl.querySelectorAll('.ux-csel-option').forEach(o => o.classList.remove('ux-csel-active'));
+      activeSideOpt.classList.add('ux-csel-active');
+    }
+  }
+  // Update custom timezone dropdown label
+  const currentTz = settings.timezone || 'auto';
+  const tzLabel = root.querySelector('#ux-tz-label');
+  const tzDropdownEl = root.querySelector('#ux-tz-dropdown');
+  if (tzLabel && tzDropdownEl) {
+    const activeOpt = tzDropdownEl.querySelector(`.ux-csel-option[data-value="${currentTz}"]`);
+    if (activeOpt) {
+      tzLabel.textContent = activeOpt.textContent;
+      tzDropdownEl.querySelectorAll('.ux-csel-option').forEach(o => o.classList.remove('ux-csel-active'));
+      activeOpt.classList.add('ux-csel-active');
+    }
+  }
   if (floatToggle) floatToggle.checked = settings.floating === true;
 
   const isFloating = settings.floating === true;
@@ -1060,23 +1127,58 @@ function bindEvents() {
     await saveSettings({ floating_opacity: val });
   });
 
-  root.querySelector('#ux-setting-side')?.addEventListener('change', async (e) => {
-    const side = e.target.value;
-    await saveSettings({ sidebar_side: side });
-    const s = await getSettings();
-    if (!s.floating) {
-      if (side === 'right') {
-        root.classList.add('ux-side-right');
-      } else {
-        root.classList.remove('ux-side-right');
+  // Custom sidebar side dropdown
+  const sideBtn = root.querySelector('#ux-side-btn');
+  const sideDrop = root.querySelector('#ux-side-dropdown');
+  const sideWrap = root.querySelector('#ux-side-select');
+  if (sideBtn && sideDrop && sideWrap) {
+    sideBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      root.querySelector('#ux-tz-select')?.classList.remove('ux-csel-open');
+      sideWrap.classList.toggle('ux-csel-open');
+    });
+    sideDrop.addEventListener('click', async (e) => {
+      const opt = e.target.closest('.ux-csel-option');
+      if (!opt) return;
+      const side = opt.dataset.value;
+      await saveSettings({ sidebar_side: side });
+      sideWrap.classList.remove('ux-csel-open');
+      const s = await getSettings();
+      if (!s.floating) {
+        if (side === 'right') {
+          root.classList.add('ux-side-right');
+        } else {
+          root.classList.remove('ux-side-right');
+        }
       }
-    }
-  });
+      updateUI().catch(() => {});
+    });
+    document.addEventListener('click', (e) => {
+      if (!sideWrap.contains(e.target)) sideWrap.classList.remove('ux-csel-open');
+    });
+  }
 
-  root.querySelector('#ux-setting-timezone')?.addEventListener('change', async (e) => {
-    await saveSettings({ timezone: e.target.value });
-    updateUI().catch(() => {});
-  });
+  // Custom timezone dropdown
+  const tzBtn = root.querySelector('#ux-tz-btn');
+  const tzDrop = root.querySelector('#ux-tz-dropdown');
+  const tzWrap = root.querySelector('#ux-tz-select');
+  if (tzBtn && tzDrop && tzWrap) {
+    tzBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      root.querySelector('#ux-side-select')?.classList.remove('ux-csel-open');
+      tzWrap.classList.toggle('ux-csel-open');
+    });
+    tzDrop.addEventListener('click', async (e) => {
+      const opt = e.target.closest('.ux-csel-option');
+      if (!opt) return;
+      await saveSettings({ timezone: opt.dataset.value });
+      tzWrap.classList.remove('ux-csel-open');
+      updateUI().catch(() => {});
+    });
+    document.addEventListener('click', (e) => {
+      if (!tzWrap.contains(e.target)) tzWrap.classList.remove('ux-csel-open');
+    });
+  }
 
   // Float toggle — move DOM node, never destroy+recreate
   root.querySelector('#ux-setting-float')?.addEventListener('change', async (e) => {
@@ -1331,10 +1433,16 @@ function getSidebarHTML() {
         
         <div class="ux-setting-row" id="ux-sidebar-side-row">
           <span class="ux-setting-label">Sidebar side</span>
-          <select id="ux-setting-side" class="ux-select">
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
+          <div class="ux-csel" id="ux-side-select">
+            <button class="ux-csel-btn" id="ux-side-btn" type="button">
+              <span id="ux-side-label">Left</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="ux-csel-dropdown" id="ux-side-dropdown">
+              <div class="ux-csel-option ux-csel-active" data-value="left">Left</div>
+              <div class="ux-csel-option" data-value="right">Right</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1342,26 +1450,44 @@ function getSidebarHTML() {
         <div class="ux-settings-section-title">Regional Settings</div>
         <div class="ux-setting-row">
           <span class="ux-setting-label">Timezone</span>
-          <select id="ux-setting-timezone" class="ux-select">
-            <option value="auto">Auto-detect</option>
-            <option value="IST">IST (UTC+5:30)</option>
-            <option value="EST">EST (UTC-5)</option>
-            <option value="CST">CST (UTC-6)</option>
-            <option value="MST">MST (UTC-7)</option>
-            <option value="PST">PST (UTC-8)</option>
-            <option value="GMT">GMT (UTC+0)</option>
-            <option value="CET">CET (UTC+1)</option>
-            <option value="EET">EET (UTC+2)</option>
-            <option value="MSK">MSK (UTC+3)</option>
-            <option value="GST">GST (UTC+4)</option>
-            <option value="PKT">PKT (UTC+5)</option>
-            <option value="BST">BST (UTC+6)</option>
-            <option value="WIB">WIB (UTC+7)</option>
-            <option value="CST-Asia">CST (UTC+8)</option>
-            <option value="JST">JST (UTC+9)</option>
-            <option value="AEST">AEST (UTC+10)</option>
-            <option value="NZST">NZST (UTC+12)</option>
-          </select>
+          <div class="ux-csel" id="ux-tz-select">
+            <button class="ux-csel-btn" id="ux-tz-btn" type="button">
+              <span id="ux-tz-label">Auto-detect</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="ux-csel-dropdown" id="ux-tz-dropdown">
+              <div class="ux-csel-option ux-csel-active" data-value="auto">Auto-detect</div>
+              <div class="ux-csel-group">Americas</div>
+              <div class="ux-csel-option" data-value="HST">HST (UTC−10)</div>
+              <div class="ux-csel-option" data-value="AKST">AKST (UTC−9)</div>
+              <div class="ux-csel-option" data-value="PST">PST (UTC−8)</div>
+              <div class="ux-csel-option" data-value="MST">MST (UTC−7)</div>
+              <div class="ux-csel-option" data-value="CST">CST (UTC−6)</div>
+              <div class="ux-csel-option" data-value="EST">EST (UTC−5)</div>
+              <div class="ux-csel-option" data-value="AST">AST (UTC−4)</div>
+              <div class="ux-csel-option" data-value="BRT">BRT (UTC−3)</div>
+              <div class="ux-csel-group">Europe & Africa</div>
+              <div class="ux-csel-option" data-value="GMT">GMT (UTC+0)</div>
+              <div class="ux-csel-option" data-value="CET">CET (UTC+1)</div>
+              <div class="ux-csel-option" data-value="EET">EET (UTC+2)</div>
+              <div class="ux-csel-option" data-value="MSK">MSK (UTC+3)</div>
+              <div class="ux-csel-group">Middle East & Asia</div>
+              <div class="ux-csel-option" data-value="GST">GST (UTC+4)</div>
+              <div class="ux-csel-option" data-value="PKT">PKT (UTC+5)</div>
+              <div class="ux-csel-option" data-value="IST">IST (UTC+5:30)</div>
+              <div class="ux-csel-option" data-value="NPT">NPT (UTC+5:45)</div>
+              <div class="ux-csel-option" data-value="BST">BST (UTC+6)</div>
+              <div class="ux-csel-option" data-value="ICT">ICT (UTC+7)</div>
+              <div class="ux-csel-option" data-value="CST-Asia">CST (UTC+8)</div>
+              <div class="ux-csel-option" data-value="SGT">SGT (UTC+8)</div>
+              <div class="ux-csel-option" data-value="JST">JST (UTC+9)</div>
+              <div class="ux-csel-option" data-value="KST">KST (UTC+9)</div>
+              <div class="ux-csel-group">Oceania</div>
+              <div class="ux-csel-option" data-value="ACST">ACST (UTC+9:30)</div>
+              <div class="ux-csel-option" data-value="AEST">AEST (UTC+10)</div>
+              <div class="ux-csel-option" data-value="NZST">NZST (UTC+12)</div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1383,8 +1509,9 @@ function getSidebarHTML() {
           <span id="ux-export-label">Export JSON</span>
           <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
         </button>
-        <button class="ux-settings-btn" id="ux-btn-debug">
-          Debug viewer (<span id="ux-debug-count">0 logs</span>)
+        <button class="ux-settings-btn ux-btn-with-badge" id="ux-btn-debug">
+          <span>Debug viewer</span>
+          <span class="ux-count-badge" id="ux-debug-count">0</span>
         </button>
       </div>
       <div class="ux-settings-btns-row">
@@ -1571,9 +1698,7 @@ function getCSS() {
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 .ux-setting-row-sub {
-  padding-left: 12px;
-  border-left: 1.5px solid var(--ux-border);
-  margin-left: 2px;
+  padding-left: 14px;
 }
 #ux-inner { padding: 13px 14px 12px; }
 .ux-header {
@@ -1666,26 +1791,29 @@ function getCSS() {
   top: calc(100% + 7px);
   left: 50%;
   transform: translateX(-50%) translateY(-3px);
-  background: rgba(26, 26, 26, 0.85) !important;
+  background: rgba(26, 26, 26, 0.9) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
   color: #e0e0e0 !important;
   font-size: 11px !important;
   font-weight: 500 !important;
-  line-height: 16px !important;
+  line-height: 15px !important;
   display: block !important;
   box-sizing: border-box !important;
-  padding: 4px 8px !important;
-  border-radius: 4px !important;
-  white-space: nowrap !important;
+  padding: 5px 10px !important;
+  border-radius: 6px !important;
+  white-space: normal !important;
+  width: max-content !important;
+  max-width: 280px !important;
   pointer-events: none !important;
   opacity: 0;
   transition: opacity 0.15s ease, transform 0.15s ease;
   z-index: 2147483647;
   border: 1px solid #333 !important;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.4) !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5) !important;
   font-family: var(--ux-font) !important;
   letter-spacing: 0.01em !important;
+  text-align: center;
 }
 #usagex-v2-root [data-tooltip]:hover::after {
   opacity: 1;
@@ -1925,6 +2053,75 @@ function getCSS() {
   font-weight: 500; outline: none; transition: border-color 0.12s;
 }
 .ux-select:focus { border-color: var(--ux-accent-dim); }
+/* ── Custom dropdown (Claude-style) ── */
+.ux-csel { position: relative; }
+.ux-csel-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--ux-surface); border: 1px solid var(--ux-border);
+  border-radius: 6px; color: var(--ux-text-1); font-size: 11.5px;
+  padding: 4px 9px; font-family: var(--ux-font); cursor: pointer;
+  font-weight: 500; transition: border-color 0.15s, background 0.15s;
+}
+.ux-csel-btn:hover { border-color: var(--ux-accent-dim); background: var(--ux-hover); }
+.ux-csel-btn svg {
+  opacity: 0.45; flex-shrink: 0;
+  transition: transform 0.2s ease, opacity 0.15s;
+}
+.ux-csel.ux-csel-open .ux-csel-btn svg { transform: rotate(180deg); opacity: 0.7; }
+.ux-csel.ux-csel-open .ux-csel-btn { border-color: var(--ux-accent-dim); background: var(--ux-hover); }
+.ux-csel-dropdown {
+  position: absolute; top: calc(100% + 5px); right: 0;
+  min-width: 155px; max-height: 260px; overflow-y: auto;
+  background: rgba(22, 22, 22, 0.97);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 4px; opacity: 0; visibility: hidden;
+  transform: translateY(-6px) scale(0.97);
+  transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s;
+  z-index: 200;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.3);
+}
+.ux-csel.ux-csel-open .ux-csel-dropdown {
+  opacity: 1; visibility: visible; transform: translateY(0) scale(1);
+}
+.ux-csel-option {
+  padding: 5px 10px; font-size: 11.5px; color: var(--ux-text-2);
+  border-radius: 6px; cursor: pointer; font-weight: 400;
+  transition: background 0.1s, color 0.1s; white-space: nowrap;
+}
+.ux-csel-option:hover {
+  background: rgba(255,255,255,0.07); color: var(--ux-text-1);
+}
+.ux-csel-active {
+  color: var(--ux-accent) !important; font-weight: 600;
+  background: rgba(204,153,102,0.08);
+}
+.ux-csel-active:hover { background: rgba(204,153,102,0.14); }
+.ux-csel-group {
+  padding: 8px 10px 4px; font-size: 9.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--ux-text-4); pointer-events: none; user-select: none;
+}
+.ux-csel-group:not(:first-child) {
+  margin-top: 2px; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 8px;
+}
+.ux-csel-dropdown::-webkit-scrollbar { width: 4px; }
+.ux-csel-dropdown::-webkit-scrollbar-track { background: transparent; }
+.ux-csel-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1); border-radius: 2px;
+}
+.ux-csel-dropdown::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }
+/* ── Debug badge ── */
+.ux-btn-with-badge {
+  display: inline-flex !important; align-items: center; justify-content: center; gap: 6px;
+}
+.ux-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(255,255,255,0.07); border-radius: 10px;
+  font-size: 10px; font-weight: 600; padding: 1px 7px;
+  min-width: 20px; color: var(--ux-text-3); line-height: 1.4;
+  border: 1px solid rgba(255,255,255,0.05);
+}
 .ux-settings-actions-group {
   display: flex;
   flex-direction: column;
@@ -2024,9 +2221,7 @@ function getCSS() {
   top: auto;
   bottom: calc(100% + 7px);
   transform: translateX(-50%) translateY(3px);
-  white-space: normal !important;
-  max-width: 200px;
-  text-align: center;
+  max-width: 280px !important;
 }
 #usagex-v2-root .ux-peak-track[data-tooltip]:hover::after {
   transform: translateX(-50%) translateY(0);
