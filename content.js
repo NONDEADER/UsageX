@@ -775,8 +775,8 @@ async function updateUI() {
     if (sessionTimeEl) {
       const [sessionRemaining, sessionReset] = sessionTimeStr.split(' · ');
       sessionTimeEl.innerHTML = sessionReset
-        ? `<span class="ux-time-remaining">${sessionRemaining}</span> <span class="ux-time-reset">· ${sessionReset}</span>`
-        : `<span class="ux-time-remaining">${sessionTimeStr}</span>`;
+        ? `<div class="ux-time-line"><span class="ux-time-remaining">${sessionRemaining}</span></div><div class="ux-time-line"><span class="ux-time-reset"><svg class="ux-reset-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${sessionReset}</span></div>`
+        : `<div class="ux-time-line"><span class="ux-time-remaining">${sessionTimeStr}</span></div>`;
     }
   } else {
     setEl('#ux-session-time', '');
@@ -787,8 +787,8 @@ async function updateUI() {
     if (weeklyTimeEl) {
       const [weeklyRemaining, weeklyReset] = weeklyTimeStr.split(' · ');
       weeklyTimeEl.innerHTML = weeklyReset
-        ? `<span class="ux-time-remaining">${weeklyRemaining}</span> <span class="ux-time-reset">· ${weeklyReset}</span>`
-        : `<span class="ux-time-remaining">${weeklyTimeStr}</span>`;
+        ? `<div class="ux-time-line"><span class="ux-time-remaining">${weeklyRemaining}</span></div><div class="ux-time-line"><span class="ux-time-reset"><svg class="ux-reset-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>${weeklyReset}</span></div>`
+        : `<div class="ux-time-line"><span class="ux-time-remaining">${weeklyTimeStr}</span></div>`;
     }
   } else {
     setEl('#ux-weekly-time', '');
@@ -801,10 +801,21 @@ async function updateUI() {
   setEl('#ux-debug-count', `${dbgCount} logs`);
 
   const sessionRemainingEstimate = estimateMessagesRemaining(sessionPct, usage_limits?.session_resets_at, debugLogs);
+  // Fold messages-remaining into the session track tooltip instead of a separate line
+  const sessionTrackForRemaining = root.querySelector('#ux-session-track');
+  if (sessionTrackForRemaining) {
+    let tipText = getSessionTooltipText(sessionPct);
+    if (sessionRemainingEstimate != null && tipText) {
+      tipText += ` · ~${sessionRemainingEstimate} msgs left`;
+    }
+    if (tipText && Number(sessionPct) > 0) {
+      sessionTrackForRemaining.setAttribute('data-tooltip', tipText);
+    }
+  }
+  // Hide the old separate element if it exists
   const sessionRemainingEl = root.querySelector('#ux-session-remaining');
   if (sessionRemainingEl) {
-    sessionRemainingEl.textContent = sessionRemainingEstimate != null ? `~${sessionRemainingEstimate} messages remaining` : '';
-    sessionRemainingEl.style.display = sessionRemainingEstimate != null ? 'block' : 'none';
+    sessionRemainingEl.style.display = 'none';
   }
 
   // Settings panel state
@@ -1798,16 +1809,34 @@ function getCSS() {
   color: var(--ux-text-3);
   line-height: 1.4;
   letter-spacing: 0.01em;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ux-time-line {
+  display: flex;
+  align-items: center;
 }
 .ux-time-remaining {
   color: var(--ux-text-2);
   font-weight: 600;
-  font-size: 11.5px;
+  font-size: 12px;
 }
 .ux-time-reset {
-  color: var(--ux-text-3);
-  font-size: 10px;
-  font-weight: 400;
+  color: var(--ux-text-2);
+  font-size: 11px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.ux-reset-icon {
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+}
+.ux-bar-item:hover .ux-reset-icon {
+  opacity: 0.85;
 }
 .ux-meta {
   font-size: 10.5px;
@@ -1816,10 +1845,7 @@ function getCSS() {
   margin-top: 3px;
 }
 #ux-session-remaining {
-  font-size: 11px;
-  color: #666;
-  margin-top: 4px;
-  font-style: italic;
+  display: none;
 }
 .ux-export-chip {
   display: none;
