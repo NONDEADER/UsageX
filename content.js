@@ -2011,6 +2011,9 @@ function getCSS() {
   display: flex; align-items: center; justify-content: space-between;
   padding: 7px 0; border-bottom: 1px solid var(--ux-border-subtle);
 }
+.ux-setting-row:last-child {
+  border-bottom: none;
+}
 .ux-setting-label { font-size: 13px; font-weight: 500; color: var(--ux-text-2); }
 .ux-shortcut-footer {
   margin-top: 16px;
