@@ -1,6 +1,7 @@
 # UsageX v2
 
-**[🌐 Website](https://usagex.carrd.co/)** &nbsp;·&nbsp; **[🦊 Install on Firefox](https://addons.mozilla.org/en-US/firefox/addon/usagex/)**
+[![Website](https://img.shields.io/badge/Website-usagex.carrd.co-4A90D9?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://usagex.carrd.co/)
+[![Firefox Add-on](https://img.shields.io/badge/Firefox-Install%20Add--on-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/usagex/)
 
 > A Firefox (Manifest V3) extension that tracks your **Claude.ai** usage and renders a live stats sidebar directly on the page — no popup, no external server, no third-party libraries.
 
