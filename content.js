@@ -1201,7 +1201,7 @@ function getSidebarHTML() {
       <div class="ux-title">
         <div class="ux-title-icon-wrap">
           <svg class="ux-title-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m12 14 4-4"/>
+            <path class="ux-needle" d="m12 14 4-4"/>
             <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
           </svg>
           <div class="ux-dot" id="ux-live-dot"></div>
@@ -1584,9 +1584,26 @@ function getCSS() {
   color: var(--ux-text-3);
   display: block;
   transition: color 0.2s ease;
+  overflow: visible;
 }
 .ux-header:hover .ux-title-icon {
   color: var(--ux-text-2);
+}
+.ux-needle {
+  transform-origin: 12px 14px;
+  transition: transform 0.3s ease;
+}
+.ux-title-icon-wrap:hover .ux-needle {
+  animation: ux-needle-sweep 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes ux-needle-sweep {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(-55deg); }
+  30%  { transform: rotate(-95deg); }
+  50%  { transform: rotate(-70deg); }
+  65%  { transform: rotate(-90deg); }
+  80%  { transform: rotate(-45deg); }
+  100% { transform: rotate(-50deg); }
 }
 .ux-dot {
   position: absolute;
