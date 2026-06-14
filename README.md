@@ -1,5 +1,7 @@
 # UsageX v2
 
+**[🌐 Website](https://usagex.carrd.co/)** &nbsp;·&nbsp; **[🦊 Install on Firefox](https://addons.mozilla.org/en-US/firefox/addon/usagex/)**
+
 > A Firefox (Manifest V3) extension that tracks your **Claude.ai** usage and renders a live stats sidebar directly on the page — no popup, no external server, no third-party libraries.
 
 ---
@@ -46,14 +48,22 @@ Claude page fetch()
 
 ---
 
-## Installation (Firefox — temporary add-on)
+## Installation
+
+### Firefox (recommended)
+
+Install directly from the official listing — no restart required:
+
+**[➜ Add to Firefox](https://addons.mozilla.org/en-US/firefox/addon/usagex/)**
+
+Or load it as a temporary add-on from source:
 
 1. Open Firefox and navigate to `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on…**
 3. Select the `manifest.json` file inside this folder.
 4. Open [https://claude.ai/](https://claude.ai/) — the sidebar panel appears automatically.
 
-> **Note:** Temporary add-ons are removed when Firefox restarts. For a persistent install you would need to sign the extension via [addons.mozilla.org](https://addons.mozilla.org).
+> **Note:** Temporary add-ons loaded from source are removed when Firefox restarts.
 
 ## Installation (Chrome / Edge — developer mode)
 
