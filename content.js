@@ -616,7 +616,6 @@ async function setPanelCollapsed(collapsed, options = {}) {
 
   if (resetViews && collapsed) {
     root.classList.remove('ux-settings-open');
-    root.classList.remove('ux-advanced-open');
   }
 
   if (persist) {
@@ -822,6 +821,16 @@ async function updateUI() {
   const isOpacityEnabled = settings.floating_opacity_enabled !== false;
   const opacityVal = settings.floating_opacity != null ? settings.floating_opacity : 0.85;
 
+  const sidebarSideRow = root.querySelector('#ux-sidebar-side-row');
+  if (sidebarSideRow) {
+    sidebarSideRow.style.display = isFloating ? 'none' : 'flex';
+  }
+
+  const opacityCheckboxRow = root.querySelector('#ux-opacity-checkbox-row');
+  if (opacityCheckboxRow) {
+    opacityCheckboxRow.style.display = isFloating ? 'flex' : 'none';
+  }
+
   const opacityRow = root.querySelector('#ux-opacity-slider-row');
   if (opacityRow) {
     opacityRow.style.display = (isFloating && isOpacityEnabled) ? 'flex' : 'none';
@@ -989,7 +998,6 @@ function bindEvents() {
   });
 
   root.querySelector('#ux-btn-settings')?.addEventListener('click', () => {
-    root.classList.remove('ux-advanced-open');
     root.classList.toggle('ux-settings-open');
     updateUI().catch(() => {});
   });
@@ -997,16 +1005,6 @@ function bindEvents() {
   // Settings back → main view
   root.querySelector('#ux-settings-back-btn')?.addEventListener('click', () => {
     root.classList.remove('ux-settings-open');
-    root.classList.remove('ux-advanced-open');
-  });
-
-  // Advanced back → settings
-  root.querySelector('#ux-advanced-back-btn')?.addEventListener('click', () => {
-    root.classList.remove('ux-advanced-open');
-  });
-
-  root.querySelector('#ux-advanced-btn')?.addEventListener('click', () => {
-    root.classList.add('ux-advanced-open');
   });
 
   root.querySelector('#ux-btn-export')?.addEventListener('click', async () => {
@@ -1291,89 +1289,101 @@ function getSidebarHTML() {
       </button>
       <span class="ux-settings-title">Settings</span>
     </div>
-    <div class="ux-setting-row">
-      <span class="ux-setting-label">Float panel</span>
-      <label class="ux-toggle">
-        <input type="checkbox" id="ux-setting-float">
-        <span class="ux-toggle-track"></span>
-      </label>
-    </div>
-    <div class="ux-setting-row" id="ux-opacity-slider-row" style="display: none;">
-      <span class="ux-setting-label">Panel opacity</span>
-      <div style="display: flex; align-items: center; gap: 8px;">
-        <input type="range" id="ux-setting-opacity-slider" min="10" max="100" step="5" class="ux-range-slider" style="width: 80px;">
-        <span id="ux-opacity-val" style="font-size: 11.5px; color: var(--ux-text-2); min-width: 28px; text-align: right;">85%</span>
+
+    <div class="ux-settings-content">
+      <div class="ux-settings-section">
+        <div class="ux-settings-section-title">Appearance & Layout</div>
+        
+        <div class="ux-setting-row">
+          <span class="ux-setting-label">Float panel</span>
+          <label class="ux-toggle">
+            <input type="checkbox" id="ux-setting-float">
+            <span class="ux-toggle-track"></span>
+          </label>
+        </div>
+        
+        <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-checkbox-row" style="display: none;">
+          <span class="ux-setting-label">Fade when inactive</span>
+          <label class="ux-toggle">
+            <input type="checkbox" id="ux-setting-floating-opacity-enabled">
+            <span class="ux-toggle-track"></span>
+          </label>
+        </div>
+        
+        <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-slider-row" style="display: none;">
+          <span class="ux-setting-label">Opacity level</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <input type="range" id="ux-setting-opacity-slider" min="10" max="100" step="5" class="ux-range-slider" style="width: 80px;">
+            <span id="ux-opacity-val" style="font-size: 11.5px; color: var(--ux-text-2); min-width: 28px; text-align: right;">85%</span>
+          </div>
+        </div>
+        
+        <div class="ux-setting-row" id="ux-sidebar-side-row">
+          <span class="ux-setting-label">Sidebar side</span>
+          <select id="ux-setting-side" class="ux-select">
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ux-settings-section">
+        <div class="ux-settings-section-title">Regional Settings</div>
+        <div class="ux-setting-row">
+          <span class="ux-setting-label">Timezone</span>
+          <select id="ux-setting-timezone" class="ux-select">
+            <option value="auto">Auto-detect</option>
+            <option value="IST">IST (UTC+5:30)</option>
+            <option value="EST">EST (UTC-5)</option>
+            <option value="CST">CST (UTC-6)</option>
+            <option value="MST">MST (UTC-7)</option>
+            <option value="PST">PST (UTC-8)</option>
+            <option value="GMT">GMT (UTC+0)</option>
+            <option value="CET">CET (UTC+1)</option>
+            <option value="EET">EET (UTC+2)</option>
+            <option value="MSK">MSK (UTC+3)</option>
+            <option value="GST">GST (UTC+4)</option>
+            <option value="PKT">PKT (UTC+5)</option>
+            <option value="BST">BST (UTC+6)</option>
+            <option value="WIB">WIB (UTC+7)</option>
+            <option value="CST-Asia">CST (UTC+8)</option>
+            <option value="JST">JST (UTC+9)</option>
+            <option value="AEST">AEST (UTC+10)</option>
+            <option value="NZST">NZST (UTC+12)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="ux-settings-section">
+        <div class="ux-settings-section-title">Diagnostics & Logs</div>
+        <div class="ux-setting-row">
+          <span class="ux-setting-label">Debug logging</span>
+          <label class="ux-toggle">
+            <input type="checkbox" id="ux-setting-debug">
+            <span class="ux-toggle-track"></span>
+          </label>
+        </div>
       </div>
     </div>
-    <div class="ux-setting-row">
-      <span class="ux-setting-label">Sidebar side</span>
-      <select id="ux-setting-side" class="ux-select">
-        <option value="left">Left</option>
-        <option value="right">Right</option>
-      </select>
+
+    <div class="ux-settings-actions-group">
+      <div class="ux-settings-btns-row">
+        <button class="ux-settings-btn" id="ux-btn-export">
+          <span id="ux-export-label">Export JSON</span>
+          <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
+        </button>
+        <button class="ux-settings-btn" id="ux-btn-debug">
+          Debug viewer (<span id="ux-debug-count">0 logs</span>)
+        </button>
+      </div>
+      <div class="ux-settings-btns-row">
+        <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-reset">Reset Stats</button>
+        <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-clear-debug">Clear Logs</button>
+      </div>
     </div>
-    <div class="ux-setting-row">
-      <span class="ux-setting-label">Debug logging</span>
-      <label class="ux-toggle">
-        <input type="checkbox" id="ux-setting-debug">
-        <span class="ux-toggle-track"></span>
-      </label>
-    </div>
-    <button class="ux-advanced-btn" id="ux-advanced-btn">Advanced</button>
-    <div class="ux-settings-btns">
-      <button class="ux-settings-btn" id="ux-btn-export">
-        <span id="ux-export-label">Export JSON data</span>
-        <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
-      </button>
-      <button class="ux-settings-btn" id="ux-btn-debug">
-        View debug viewer (<span id="ux-debug-count">0 logs</span>)
-      </button>
-      <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-reset">Reset local stats</button>
-      <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-clear-debug">Clear debug logs</button>
-    </div>
+
     <div class="ux-shortcut-footer">
       Press <kbd>Alt</kbd>+<kbd>U</kbd> to toggle panel
-    </div>
-  </div>
-
-  <div id="ux-advanced-panel">
-    <div class="ux-settings-header">
-      <button class="ux-header-back-btn" id="ux-advanced-back-btn" aria-label="Back" data-tooltip="Back">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-        </svg>
-      </button>
-      <span class="ux-settings-title">Advanced</span>
-    </div>
-    <div class="ux-setting-row">
-      <span class="ux-setting-label">Timezone</span>
-      <select id="ux-setting-timezone" class="ux-select">
-        <option value="auto">Auto-detect</option>
-        <option value="IST">IST (UTC+5:30)</option>
-        <option value="EST">EST (UTC-5)</option>
-        <option value="CST">CST (UTC-6)</option>
-        <option value="MST">MST (UTC-7)</option>
-        <option value="PST">PST (UTC-8)</option>
-        <option value="GMT">GMT (UTC+0)</option>
-        <option value="CET">CET (UTC+1)</option>
-        <option value="EET">EET (UTC+2)</option>
-        <option value="MSK">MSK (UTC+3)</option>
-        <option value="GST">GST (UTC+4)</option>
-        <option value="PKT">PKT (UTC+5)</option>
-        <option value="BST">BST (UTC+6)</option>
-        <option value="WIB">WIB (UTC+7)</option>
-        <option value="CST-Asia">CST (UTC+8)</option>
-        <option value="JST">JST (UTC+9)</option>
-        <option value="AEST">AEST (UTC+10)</option>
-        <option value="NZST">NZST (UTC+12)</option>
-      </select>
-    </div>
-    <div class="ux-setting-row">
-      <span class="ux-setting-label">Floating opacity</span>
-      <label class="ux-toggle">
-        <input type="checkbox" id="ux-setting-floating-opacity-enabled">
-        <span class="ux-toggle-track"></span>
-      </label>
     </div>
   </div>
 
@@ -1528,9 +1538,32 @@ function getCSS() {
 #ux-settings-panel { display: none; }
 #usagex-v2-root.ux-settings-open #ux-main-view  { display: none; }
 #usagex-v2-root.ux-settings-open #ux-settings-panel { display: flex; flex-direction: column; }
-#ux-advanced-panel { display: none; }
-#usagex-v2-root.ux-advanced-open #ux-settings-panel { display: none; }
-#usagex-v2-root.ux-advanced-open #ux-advanced-panel { display: flex; flex-direction: column; }
+.ux-settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ux-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ux-settings-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ux-text-3);
+  margin-bottom: 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+.ux-setting-row-sub {
+  padding-left: 12px;
+  border-left: 1.5px solid var(--ux-border);
+  margin-left: 2px;
+}
 #ux-inner { padding: 13px 14px 12px; }
 .ux-header {
   display: flex; align-items: center;
@@ -1849,17 +1882,22 @@ function getCSS() {
   font-weight: 500; outline: none; transition: border-color 0.12s;
 }
 .ux-select:focus { border-color: var(--ux-accent-dim); }
-.ux-advanced-btn {
-  display: flex; align-items: center; justify-content: space-between;
-  width: 100%; margin: 8px 0 6px; padding: 7px 0;
-  background: transparent; border: none;
-  border-bottom: 1px solid var(--ux-border-subtle);
-  font-size: 13px; color: var(--ux-text-2); cursor: pointer;
-  font-family: var(--ux-font); font-weight: 500; text-align: left; transition: color 0.12s;
+.ux-settings-actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  border-top: 1px solid var(--ux-border-subtle);
+  padding-top: 12px;
 }
-.ux-advanced-btn::after { content: "\\203A"; font-size: 16px; color: var(--ux-text-4); }
-.ux-advanced-btn:hover { color: var(--ux-text-1); }
-.ux-settings-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 9px; }
+.ux-settings-btns-row {
+  display: flex;
+  gap: 6px;
+}
+.ux-settings-btns-row .ux-settings-btn {
+  flex: 1;
+  width: auto;
+}
 .ux-settings-btn {
   width: 100%; padding: 7px 0; background: rgba(255, 255, 255, 0.05);
   border: none; border-radius: var(--ux-radius);
