@@ -14,6 +14,8 @@ function freshToday() {
     time_s:  0,
     tokens_est: 0,
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
+    processed_msg_uuids: [],
+    recent_sent_prompts: [],
   };
 }
 

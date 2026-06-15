@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UsageX v2</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Header -->
+  <div class="px-header">
+    <div class="px-header-logo">
+      <svg class="px-logo-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m12 14 4-4"/>
+        <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+      </svg>
+      <div class="px-live-dot" id="px-live-dot"></div>
+    </div>
+    <span class="px-header-title">UsageX <span class="px-header-v">v2</span></span>
+    <a class="px-header-claude-btn" id="px-open-claude" href="#" title="Open Claude.ai">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+        <polyline points="15 3 21 3 21 9"/>
+        <line x1="10" y1="14" x2="21" y2="3"/>
+      </svg>
+      Open Claude
+    </a>
+  </div>
+
+  <!-- Tab Nav -->
+  <div class="px-tabs" role="tablist">
+    <button class="px-tab px-tab-active" id="tab-dashboard" role="tab" aria-selected="true" aria-controls="panel-dashboard">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+      </svg>
+      Dashboard
+    </button>
+    <button class="px-tab" id="tab-tools" role="tab" aria-selected="false" aria-controls="panel-tools">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+      Tools
+    </button>
+  </div>
+
+  <!-- ── PANEL: Dashboard ── -->
+  <div class="px-panel px-panel-active" id="panel-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
+
+    <!-- Status banner -->
+    <div class="px-status-banner px-status-inactive" id="px-status-banner">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <span id="px-status-text">Open claude.ai to track usage</span>
+    </div>
+
+    <!-- Usage bars section -->
+    <div class="px-section">
+      <div class="px-section-title">Usage Limits</div>
+
+      <div class="px-bar-item">
+        <div class="px-bar-top">
+          <span class="px-bar-label">Session (5h)</span>
+          <div class="px-bar-top-right">
+            <span class="px-rate-dot" id="px-rate-dot" title="Usage rate"></span>
+            <span class="px-pct" id="px-session-pct">—</span>
+          </div>
+        </div>
+        <div class="px-track">
+          <div class="px-fill px-fill-session" id="px-bar-session" style="width:0%"></div>
+        </div>
+        <div class="px-reset-time" id="px-session-time"></div>
+      </div>
+
+      <div class="px-bar-item">
+        <div class="px-bar-top">
+          <span class="px-bar-label">Weekly</span>
+          <span class="px-pct" id="px-weekly-pct">—</span>
+        </div>
+        <div class="px-track">
+          <div class="px-fill px-fill-weekly" id="px-bar-weekly" style="width:0%"></div>
+        </div>
+        <div class="px-reset-time" id="px-weekly-time"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── PANEL: Tools ── -->
+  <div class="px-panel" id="panel-tools" role="tabpanel" aria-labelledby="tab-tools">
+
+    <div class="px-section">
+      <div class="px-section-title">Data</div>
+      <div class="px-tools-btns">
+        <button class="px-tool-btn" id="px-btn-export">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
+          </svg>
+          Export JSON
+        </button>
+        <button class="px-tool-btn" id="px-btn-debug">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2a3 3 0 0 1 3 3v1h2a2 2 0 0 1 2 2v3a6 6 0 0 1-6 6H9a6 6 0 0 1-6-6V8a2 2 0 0 1 2-2h2V5a3 3 0 0 1 3-3z"/>
+            <line x1="9" y1="10" x2="15" y2="10"/>
+          </svg>
+          Debug Logs
+          <span class="px-badge" id="px-debug-badge">0</span>
+        </button>
+      </div>
+      <div class="px-tools-btns" style="margin-top:6px">
+        <button class="px-tool-btn px-tool-btn-danger" id="px-btn-reset">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+          Reset Today's Stats
+        </button>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts -->
+    <div class="px-section">
+      <div class="px-section-title">Keyboard Shortcuts</div>
+      <div class="px-shortcut-list">
+        <div class="px-shortcut-row">
+          <span class="px-shortcut-desc">Toggle panel on Claude</span>
+          <span class="px-shortcut-keys"><kbd>Alt</kbd><span class="px-key-plus">+</span><kbd>U</kbd></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Extension Info -->
+    <div class="px-section">
+      <div class="px-section-title">Extension Info</div>
+      <div class="px-info-rows">
+        <div class="px-info-row">
+          <span class="px-info-label">Version</span>
+          <span class="px-info-val">v2.0.0</span>
+        </div>
+        <div class="px-info-row">
+          <span class="px-info-label">Data stored</span>
+          <span class="px-info-val">Local only</span>
+        </div>
+        <div class="px-info-row">
+          <span class="px-info-label">Network calls</span>
+          <span class="px-info-val px-val-green">None</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="px-action-feedback" id="px-action-feedback"></div>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

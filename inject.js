@@ -5,19 +5,41 @@
     try {
       const url = typeof args[0] === 'string' ? args[0] : (args[0]?.url || '');
       
-      // Get the request method and body safely
+      // Get the request method safely
       let reqMethod = '';
-      let reqBody = '';
       if (args[1]) {
         reqMethod = args[1].method;
-        reqBody = args[1].body;
       } else if (typeof args[0] === 'object' && args[0] !== null) {
         reqMethod = args[0].method;
       }
+      reqMethod = (reqMethod || 'GET').toUpperCase();
       
       // Intercept message completion requests
-      if (reqMethod && reqMethod.toUpperCase() === 'POST' && (url.includes('/completion') || url.includes('/messages'))) {
-        window.postMessage({ type: '__ux_fetch_msg', body: reqBody }, '*');
+      if (reqMethod === 'POST' && (url.includes('/completion') || url.includes('/messages'))) {
+        (async () => {
+          let reqBody = '';
+          try {
+            if (args[1] && args[1].body) {
+              const b = args[1].body;
+              if (typeof b === 'string') {
+                reqBody = b;
+              } else if (b instanceof Blob) {
+                reqBody = await b.text();
+              } else if (b instanceof ArrayBuffer || ArrayBuffer.isView(b)) {
+                reqBody = new TextDecoder().decode(b);
+              } else if (typeof b.text === 'function') {
+                reqBody = await b.text();
+              }
+            } else if (args[0] && typeof args[0] === 'object' && typeof args[0].clone === 'function') {
+              const clone = args[0].clone();
+              reqBody = await clone.text();
+            }
+          } catch (_) {}
+          
+          if (reqBody) {
+            window.postMessage({ type: '__ux_fetch_msg', body: reqBody }, '*');
+          }
+        })().catch(() => {});
       }
       
       // Intercept usage limits/stats from Claude's organization API calls
@@ -28,6 +50,12 @@
           try {
             const json = JSON.parse(text);
             if (typeof json !== 'object' || json === null) return;
+            
+            // Intercept conversation history (GET /chat_conversations/{uuid})
+            if (url.includes('/chat_conversations/') && Array.isArray(json.chat_messages)) {
+              window.postMessage({ type: '__ux_convo_history', data: json.chat_messages }, '*');
+            }
+
             if (json.five_hour || json.seven_day) {
               window.postMessage({ type: '__ux_usage_data', data: {
                 session_pct: json.five_hour ? (json.five_hour.utilization ?? null) : null,

@@ -130,7 +130,16 @@ async function saveSettings(patch) {
 }
 
 function freshToday() {
-  return { date: todayStr(), msgs: 0, convos: 0, time_s: 0, tokens_est: 0, effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 } };
+  return {
+    date: todayStr(),
+    msgs: 0,
+    convos: 0,
+    time_s: 0,
+    tokens_est: 0,
+    effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
+    processed_msg_uuids: [],
+    recent_sent_prompts: []
+  };
 }
 
 
@@ -294,37 +303,177 @@ windowMsgHandler = (event) => {
       await browser.storage.local.set({ usage_limits: d });
       await updateUI();
     })().catch(() => {});
+  } else if (event.data.type === '__ux_convo_history') {
+    onConversationHistory(event.data.data).catch(() => {});
   }
 };
 window.addEventListener('message', windowMsgHandler);
 
 // ─── Message tracking ──────────────────────────────────────────────────────────
 
+function getPromptFingerprint(text) {
+  if (!text) return '';
+  const cleaned = text.trim();
+  return `${cleaned.length}_${cleaned.slice(0, 50)}`;
+}
+
 async function onMessageSent(req) {
   lastActive = Date.now();
   isIdle = false;
-  const effort = detectEffort();
-  let inputChars = 0;
+  let parsedBody = null;
+  let promptText = '';
   try {
-    const body = JSON.parse(req.body);
-    const lastMsg = body?.messages?.at(-1)?.content;
-    if (typeof lastMsg === 'string') inputChars = lastMsg.length;
-    else if (Array.isArray(lastMsg)) inputChars = lastMsg.map(b => b.text || '').join('').length;
+    parsedBody = JSON.parse(req.body);
+    if (parsedBody) {
+      if (typeof parsedBody.prompt === 'string') {
+        promptText = parsedBody.prompt;
+      } else if (typeof parsedBody.text === 'string') {
+        promptText = parsedBody.text;
+      } else {
+        const lastMsg = parsedBody.messages?.at(-1)?.content;
+        if (typeof lastMsg === 'string') {
+          promptText = lastMsg;
+        } else if (Array.isArray(lastMsg)) {
+          promptText = lastMsg.map(b => b.text || '').join('');
+        }
+      }
+    }
   } catch (_) {}
+  const inputChars = promptText.length;
+  const { effort, isThinking } = detectEffortAndThinking(parsedBody);
   const inputTokens = Math.round(inputChars / 4);
-  const thinkTokens = effortThinkTokens(effort);
+  const thinkTokens = isThinking ? effortThinkTokens(effort) : 0;
   const tokenDelta = inputTokens + thinkTokens;
   const res = await browser.storage.local.get('today');
   const today = res.today || freshToday();
+  
+  // Record fingerprint to avoid double counting when history is loaded
+  const fingerprint = getPromptFingerprint(promptText);
+  const recent = today.recent_sent_prompts || [];
+  if (fingerprint) {
+    recent.push(fingerprint);
+    if (recent.length > 20) recent.shift();
+  }
+  
   const effortKey = effort.toLowerCase();
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
   eb[effortKey] = (eb[effortKey] || 0) + 1;
-  await saveToday({ msgs: today.msgs + 1, tokens_est: today.tokens_est + tokenDelta, effort_breakdown: eb });
+  await saveToday({ 
+    msgs: today.msgs + 1, 
+    tokens_est: today.tokens_est + tokenDelta, 
+    effort_breakdown: eb,
+    recent_sent_prompts: recent
+  });
   updateUI().catch(() => {});
-  debugLog('msg_sent', { effort, inputTokens, thinkTokens });
+  debugLog('msg_sent', { effort, isThinking, inputTokens, thinkTokens });
   setTimeout(() => {
     fetchUsageLimitsActive().catch(() => {});
   }, 2000);
+}
+
+async function onConversationHistory(chatMessages) {
+  if (!Array.isArray(chatMessages)) return;
+
+  const res = await browser.storage.local.get('today');
+  const today = res.today || freshToday();
+  if (!today.processed_msg_uuids) {
+    today.processed_msg_uuids = [];
+  }
+  if (!today.recent_sent_prompts) {
+    today.recent_sent_prompts = [];
+  }
+
+  let updated = false;
+  let newMsgs = 0;
+  let newTokenDelta = 0;
+  const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
+
+  const isMessageToday = (dateStr) => {
+    try {
+      const date = new Date(dateStr);
+      const todayDate = new Date();
+      return date.getFullYear() === todayDate.getFullYear() &&
+             date.getMonth() === todayDate.getMonth() &&
+             date.getDate() === todayDate.getDate();
+    } catch (_) {
+      return false;
+    }
+  };
+
+  for (let i = 0; i < chatMessages.length; i++) {
+    const msg = chatMessages[i];
+    if (msg.sender !== 'human' || !msg.uuid) continue;
+
+    if (isMessageToday(msg.created_at) && !today.processed_msg_uuids.includes(msg.uuid)) {
+      let promptText = '';
+      if (Array.isArray(msg.content)) {
+        promptText = msg.content.map(b => b.text || '').join('');
+      } else if (typeof msg.content === 'string') {
+        promptText = msg.content;
+      }
+      
+      const fingerprint = getPromptFingerprint(promptText);
+      const recent = today.recent_sent_prompts || [];
+      const matchIndex = recent.indexOf(fingerprint);
+
+      if (matchIndex !== -1) {
+        // Already counted via completion. Just record UUID.
+        recent.splice(matchIndex, 1);
+        today.recent_sent_prompts = recent;
+        today.processed_msg_uuids.push(msg.uuid);
+        updated = true;
+        continue;
+      }
+
+      // Detect thinking status and effort level from the following assistant response
+      let isThinking = false;
+      let thinkingTextLength = 0;
+      const nextMsg = chatMessages[i + 1];
+      if (nextMsg && nextMsg.sender === 'assistant' && Array.isArray(nextMsg.content)) {
+        const thinkingBlock = nextMsg.content.find(b => b.type === 'thinking');
+        if (thinkingBlock) {
+          isThinking = true;
+          thinkingTextLength = (thinkingBlock.thinking || '').length;
+        }
+      }
+
+      let effort = 'Low';
+      if (isThinking) {
+        const estThinkingTokens = Math.round(thinkingTextLength / 4);
+        if (estThinkingTokens >= 15000) effort = 'Max';
+        else if (estThinkingTokens >= 4000) effort = 'High';
+        else if (estThinkingTokens >= 800) effort = 'Medium';
+        else effort = 'Low';
+      }
+
+      const inputTokens = Math.round(promptText.length / 4);
+      const thinkTokens = isThinking ? effortThinkTokens(effort) : 0;
+      const tokenDelta = inputTokens + thinkTokens;
+
+      const effortKey = effort.toLowerCase();
+      eb[effortKey] = (eb[effortKey] || 0) + 1;
+      newMsgs += 1;
+      newTokenDelta += tokenDelta;
+
+      today.processed_msg_uuids.push(msg.uuid);
+      updated = true;
+    }
+  }
+
+  if (updated) {
+    if (today.processed_msg_uuids.length > 500) {
+      today.processed_msg_uuids.splice(0, today.processed_msg_uuids.length - 500);
+    }
+    await saveToday({
+      msgs: today.msgs + newMsgs,
+      tokens_est: today.tokens_est + newTokenDelta,
+      effort_breakdown: eb,
+      processed_msg_uuids: today.processed_msg_uuids,
+      recent_sent_prompts: today.recent_sent_prompts
+    });
+    updateUI().catch(() => {});
+    debugLog('history_synced', { newMsgs, newTokenDelta });
+  }
 }
 
 function effortThinkTokens(effort) {
@@ -332,27 +481,84 @@ function effortThinkTokens(effort) {
   return map[effort] || 250;
 }
 
-function detectEffort() {
-  const selectors = [
-    '[data-testid="model-selector"]',
-    'button[aria-label*="model"]',
-    'button[aria-label*="effort"]',
-    '[class*="model-selector"]',
-    '[class*="ModelSelector"]',
-  ];
-  let text = '';
-  for (const sel of selectors) {
-    const el = document.querySelector(sel);
-    if (el) { text = el.textContent || ''; break; }
+function detectEffort(parsedBody) {
+  return detectEffortAndThinking(parsedBody).effort;
+}
+
+function detectEffortAndThinking(parsedBody) {
+  let effort = 'Low';
+  let isThinking = false;
+
+  // ── 1. Read from request body (primary source) ──
+  if (parsedBody) {
+    const thinkingType = parsedBody?.thinking?.type;
+    const isExplicitlyDisabled = thinkingType === 'disabled' || thinkingType === 'none';
+
+    const effortStr =
+      parsedBody?.output_config?.effort ??
+      parsedBody?.thinking?.effort ??
+      parsedBody?.effort ??
+      null;
+
+    const budget =
+      parsedBody?.thinking?.budget_tokens ??
+      parsedBody?.thinking_budget ??
+      parsedBody?.metadata?.thinking_budget ??
+      null;
+
+    if (!isExplicitlyDisabled) {
+      if (typeof effortStr === 'string') {
+        const e = effortStr.toLowerCase();
+        isThinking = true;
+        if (e === 'max' || e === 'xhigh') effort = 'Max';
+        else if (e === 'high') effort = 'High';
+        else if (e === 'medium') effort = 'Medium';
+        else effort = 'Low';
+      } else if (budget != null && typeof budget === 'number' && budget > 0) {
+        isThinking = true;
+        if (budget >= 16000) effort = 'Max';
+        else if (budget >= 8000)  effort = 'High';
+        else if (budget >= 2000)  effort = 'Medium';
+        else effort = 'Low';
+      } else if (thinkingType === 'enabled' || thinkingType === 'adaptive') {
+        isThinking = true;
+        effort = 'Low';
+      }
+    }
   }
-  if (!text) {
-    document.querySelectorAll('button').forEach(btn => {
-      const t = btn.textContent || '';
-      if (t.match(/\b(Low|Medium|High|Max)\b/)) text = t;
-    });
+
+  // ── 2. DOM fallback ──
+  if (!isThinking) {
+    const selectors = [
+      '[data-testid="model-selector"]',
+      'button[aria-label*="model"]',
+      'button[aria-label*="effort"]',
+      'button[aria-label*="thinking"]',
+      '[class*="model-selector"]',
+      '[class*="ModelSelector"]',
+    ];
+    let text = '';
+    for (const sel of selectors) {
+      const el = document.querySelector(sel);
+      if (el) { text = el.textContent || ''; break; }
+    }
+    if (!text) {
+      document.querySelectorAll('button').forEach(btn => {
+        const t = btn.textContent || '';
+        if (t.match(/\b(Low|Medium|High|Max)\b/)) text = t;
+      });
+    }
+    const match = text.match(/\b(Low|Medium|High|Max)\b/);
+    if (match) {
+      effort = match[1];
+      const lowerText = text.toLowerCase();
+      if (lowerText.includes('think') || lowerText.includes('reason') || lowerText.includes('effort') || effort !== 'Low') {
+        isThinking = true;
+      }
+    }
   }
-  const match = text.match(/\b(Low|Medium|High|Max)\b/);
-  return match ? match[1] : 'Low';
+
+  return { effort, isThinking };
 }
 
 // ─── URL tracking ──────────────────────────────────────────────────────────────

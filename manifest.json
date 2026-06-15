@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "alarms",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "https://claude.ai/*",
@@ -32,7 +33,10 @@
         "debug-viewer.html",
         "debug-viewer.css",
         "debug-viewer.js",
-        "inject.js"
+        "inject.js",
+        "popup.html",
+        "popup.css",
+        "popup.js"
       ],
       "matches": [
         "https://claude.ai/*",
@@ -46,7 +50,8 @@
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "UsageX v2"
+    "default_title": "UsageX v2",
+    "default_popup": "popup.html"
   },
   "browser_specific_settings": {
     "gecko": {
