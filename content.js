@@ -31,6 +31,14 @@ let isInjecting = false;
 let prevSessionPct = null;
 let prevWeeklyPct = null;
 let usageRateState = 'gray'; // 'extreme' | 'up' | 'neutral' | 'down' | 'gray'
+let alertedFlags = {
+  session80: false,
+  weekly80: false,
+  limitReached: false,
+  usageRateState: null,
+  peakHoursState: null,
+  peakHoursApproaching: false
+};
 
 // Global tracking references for cleanups
 let tryInjectInterval = null;
@@ -64,7 +72,7 @@ window.__usagex_cleanup = () => {
   }
 
   if (resetIdleHandler) {
-    ['mousemove','keydown','click','touchstart'].forEach(ev =>
+    ['mousemove', 'keydown', 'click', 'touchstart'].forEach(ev =>
       document.removeEventListener(ev, resetIdleHandler)
     );
   }
@@ -87,6 +95,14 @@ window.__usagex_cleanup = () => {
   prevSessionPct = null;
   prevWeeklyPct = null;
   usageRateState = 'gray';
+  alertedFlags = {
+    session80: false,
+    weekly80: false,
+    limitReached: false,
+    usageRateState: null,
+    peakHoursState: null,
+    peakHoursApproaching: false
+  };
   console.log('[UsageX] Cleaned up previous script instance.');
 };
 
@@ -143,7 +159,28 @@ function freshToday() {
 }
 
 
-function defaultSettings() { return { debug_logging: false, sidebar_side: 'left', timezone: 'auto', floating: false, float_x: null, float_y: null, floating_opacity_enabled: true, floating_opacity: 0.85, minimized: false, resizable: false, float_width: null, float_height: null }; }
+function defaultSettings() {
+  return {
+    debug_logging: false,
+    sidebar_side: 'left',
+    timezone: 'auto',
+    floating: false,
+    float_x: null,
+    float_y: null,
+    floating_opacity_enabled: true,
+    floating_opacity: 0.85,
+    minimized: false,
+    resizable: false,
+    float_width: null,
+    float_height: null,
+    notifications_browser: false,
+    notifications_toast: true,
+    alert_limits_reset: true,
+    alert_usage_threshold: true,
+    alert_peak_hours: true,
+    toast_position: 'bottom-right'
+  };
+}
 function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function setupSidebarResizeObserver(root) {
@@ -227,8 +264,8 @@ function formatResetTimeDisplay(timestamp, timezone) {
   if (diff <= 0) return 'resetting now';
   const resetDate = new Date(timestamp);
   const ianaTz = getIANATimezone(timezone);
-  const timeStr = resetDate.toLocaleTimeString([], { 
-    hour: '2-digit', 
+  const timeStr = resetDate.toLocaleTimeString([], {
+    hour: '2-digit',
     minute: '2-digit',
     timeZone: ianaTz
   });
@@ -295,16 +332,16 @@ function injectFetchHook() {
 windowMsgHandler = (event) => {
   if (event.source !== window) return;
   if (event.data.type === '__ux_fetch_msg') {
-    onMessageSent({ body: event.data.body }).catch(() => {});
+    onMessageSent({ body: event.data.body }).catch(() => { });
   } else if (event.data.type === '__ux_usage_data') {
     (async () => {
       const d = event.data.data;
       await updateUsageRate(d.session_pct, d.session_resets_at);
       await browser.storage.local.set({ usage_limits: d });
       await updateUI();
-    })().catch(() => {});
+    })().catch(() => { });
   } else if (event.data.type === '__ux_convo_history') {
-    onConversationHistory(event.data.data).catch(() => {});
+    onConversationHistory(event.data.data).catch(() => { });
   }
 };
 window.addEventListener('message', windowMsgHandler);
@@ -338,7 +375,7 @@ async function onMessageSent(req) {
         }
       }
     }
-  } catch (_) {}
+  } catch (_) { }
   const inputChars = promptText.length;
   const { effort, isThinking } = detectEffortAndThinking(parsedBody);
   const inputTokens = Math.round(inputChars / 4);
@@ -346,7 +383,7 @@ async function onMessageSent(req) {
   const tokenDelta = inputTokens + thinkTokens;
   const res = await browser.storage.local.get('today');
   const today = res.today || freshToday();
-  
+
   // Record fingerprint to avoid double counting when history is loaded
   const fingerprint = getPromptFingerprint(promptText);
   const recent = today.recent_sent_prompts || [];
@@ -354,20 +391,20 @@ async function onMessageSent(req) {
     recent.push(fingerprint);
     if (recent.length > 20) recent.shift();
   }
-  
+
   const effortKey = effort.toLowerCase();
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
   eb[effortKey] = (eb[effortKey] || 0) + 1;
-  await saveToday({ 
-    msgs: today.msgs + 1, 
-    tokens_est: today.tokens_est + tokenDelta, 
+  await saveToday({
+    msgs: today.msgs + 1,
+    tokens_est: today.tokens_est + tokenDelta,
     effort_breakdown: eb,
     recent_sent_prompts: recent
   });
-  updateUI().catch(() => {});
+  updateUI().catch(() => { });
   debugLog('msg_sent', { effort, isThinking, inputTokens, thinkTokens });
   setTimeout(() => {
-    fetchUsageLimitsActive().catch(() => {});
+    fetchUsageLimitsActive().catch(() => { });
   }, 2000);
 }
 
@@ -393,8 +430,8 @@ async function onConversationHistory(chatMessages) {
       const date = new Date(dateStr);
       const todayDate = new Date();
       return date.getFullYear() === todayDate.getFullYear() &&
-             date.getMonth() === todayDate.getMonth() &&
-             date.getDate() === todayDate.getDate();
+        date.getMonth() === todayDate.getMonth() &&
+        date.getDate() === todayDate.getDate();
     } catch (_) {
       return false;
     }
@@ -411,7 +448,7 @@ async function onConversationHistory(chatMessages) {
       } else if (typeof msg.content === 'string') {
         promptText = msg.content;
       }
-      
+
       const fingerprint = getPromptFingerprint(promptText);
       const recent = today.recent_sent_prompts || [];
       const matchIndex = recent.indexOf(fingerprint);
@@ -471,7 +508,7 @@ async function onConversationHistory(chatMessages) {
       processed_msg_uuids: today.processed_msg_uuids,
       recent_sent_prompts: today.recent_sent_prompts
     });
-    updateUI().catch(() => {});
+    updateUI().catch(() => { });
     debugLog('history_synced', { newMsgs, newTokenDelta });
   }
 }
@@ -517,8 +554,8 @@ function detectEffortAndThinking(parsedBody) {
       } else if (budget != null && typeof budget === 'number' && budget > 0) {
         isThinking = true;
         if (budget >= 16000) effort = 'Max';
-        else if (budget >= 8000)  effort = 'High';
-        else if (budget >= 2000)  effort = 'Medium';
+        else if (budget >= 8000) effort = 'High';
+        else if (budget >= 2000) effort = 'Medium';
         else effort = 'Low';
       } else if (thinkingType === 'enabled' || thinkingType === 'adaptive') {
         isThinking = true;
@@ -570,10 +607,10 @@ function checkUrlChange() {
       browser.storage.local.get('today').then(res => {
         const today = res.today || freshToday();
         saveToday({ convos: today.convos + 1 });
-      }).catch(() => {});
+      }).catch(() => { });
       debugLog('new_convo', { url: location.href });
     }
-    setTimeout(() => updateUI().catch(() => {}), 500);
+    setTimeout(() => updateUI().catch(() => { }), 500);
   }
 }
 
@@ -584,16 +621,16 @@ function startTimeTracking() {
     if (!isIdle) {
       browser.storage.local.get('today').then(res => {
         const today = res.today || freshToday();
-        saveToday({ time_s: today.time_s + 10 }).catch(() => {});
-      }).catch(() => {});
+        saveToday({ time_s: today.time_s + 10 }).catch(() => { });
+      }).catch(() => { });
     }
   }, TICK_MS);
 
   resetIdleHandler = () => {
     lastActive = Date.now();
-    if (isIdle) { isIdle = false; updateUI().catch(() => {}); }
+    if (isIdle) { isIdle = false; updateUI().catch(() => { }); }
   };
-  ['mousemove','keydown','click','touchstart'].forEach(ev =>
+  ['mousemove', 'keydown', 'click', 'touchstart'].forEach(ev =>
     document.addEventListener(ev, resetIdleHandler, { passive: true })
   );
   idleCheckInterval = setInterval(() => {
@@ -623,7 +660,7 @@ function findInjectTarget() {
     () => document.querySelector('[class*="sidebar"]'),
   ];
   for (const fn of strategies) {
-    try { const el = fn(); if (el) return el; } catch (_) {}
+    try { const el = fn(); if (el) return el; } catch (_) { }
   }
   return null;
 }
@@ -645,7 +682,7 @@ function findUserProfileEl(sidebar) {
         }
         if (ancestor) return ancestor;
       }
-    } catch (_) {}
+    } catch (_) { }
   }
   const children = [...sidebar.children];
   return children[children.length - 1] || null;
@@ -722,7 +759,7 @@ async function injectSidebar() {
       const fx = s.float_x != null ? s.float_x : window.innerWidth - 266;
       const fy = s.float_y != null ? s.float_y : window.innerHeight - 200;
       root.style.left = fx + 'px';
-      root.style.top  = fy + 'px';
+      root.style.top = fy + 'px';
       document.body.appendChild(root);
     } else {
       if (s.sidebar_side === 'right') root.classList.add('ux-side-right');
@@ -838,7 +875,7 @@ function calcUsageRateState(sessionPct, sessionResetsAt) {
   const ratePerHour = pct / hoursElapsed;
 
   if (ratePerHour >= 30) return 'extreme';
-  if (ratePerHour > 21)  return 'up';
+  if (ratePerHour > 21) return 'up';
   if (ratePerHour >= 19) return 'neutral';
   return 'down';
 }
@@ -894,11 +931,11 @@ function setupKeyboardShortcut() {
 
     const root = document.getElementById(UX_ID);
     if (!root) {
-      injectSidebar().catch(() => {});
+      injectSidebar().catch(() => { });
       return;
     }
 
-    togglePanelCollapsed().catch(() => {});
+    togglePanelCollapsed().catch(() => { });
   };
 
   document.addEventListener('keydown', keyboardShortcutHandler, true);
@@ -947,15 +984,15 @@ async function updateUI() {
   if (rateDotEl) {
     const rateConfig = {
       extreme: { label: 'Overuse (≥30%/h) — burning fast!', cls: 'ux-rate-extreme' },
-      up:      { label: 'Above normal (>21%/h)',             cls: 'ux-rate-up'      },
-      neutral: { label: 'On track (~20%/h)',                 cls: 'ux-rate-neutral' },
-      down:    { label: 'Below normal (<19%/h) — good!',    cls: 'ux-rate-down'   },
-      gray:    { label: 'Usage rate: Calculating...',        cls: 'ux-rate-gray'   },
+      up: { label: 'Above normal (>21%/h)', cls: 'ux-rate-up' },
+      neutral: { label: 'On track (~20%/h)', cls: 'ux-rate-neutral' },
+      down: { label: 'Below normal (<19%/h) — good!', cls: 'ux-rate-down' },
+      gray: { label: 'Usage rate: Calculating...', cls: 'ux-rate-gray' },
     };
     const cfg = rateConfig[usageRateState] || rateConfig.gray;
     rateDotEl.className = 'ux-rate-dot ' + cfg.cls;
     rateDotEl.textContent = '';
-    
+
     let tooltipText = cfg.label;
     if (sessionPct != null && Number(sessionPct) >= 100) {
       tooltipText = 'Usage limit fully reached';
@@ -1071,9 +1108,48 @@ async function updateUI() {
   }
 
   // Settings panel state
-  const dbgToggle  = root.querySelector('#ux-setting-debug');
+  const dbgToggle = root.querySelector('#ux-setting-debug');
   const floatToggle = root.querySelector('#ux-setting-float');
-  if (dbgToggle)   dbgToggle.checked   = settings.debug_logging !== false;
+  if (dbgToggle) dbgToggle.checked = settings.debug_logging !== false;
+
+  const browserNotifToggle = root.querySelector('#ux-setting-notifications-browser');
+  const toastNotifToggle = root.querySelector('#ux-setting-notifications-toast');
+  const limitsResetToggle = root.querySelector('#ux-setting-alert-limits-reset');
+  const usageThresholdToggle = root.querySelector('#ux-setting-alert-usage-threshold');
+  const peakHoursToggle = root.querySelector('#ux-setting-alert-peak-hours');
+
+  if (browserNotifToggle) browserNotifToggle.checked = settings.notifications_browser === true;
+  if (toastNotifToggle) toastNotifToggle.checked = settings.notifications_toast !== false;
+  if (limitsResetToggle) limitsResetToggle.checked = settings.alert_limits_reset !== false;
+  if (usageThresholdToggle) usageThresholdToggle.checked = settings.alert_usage_threshold !== false;
+  if (peakHoursToggle) peakHoursToggle.checked = settings.alert_peak_hours !== false;
+
+  const anyNotifEnabled = (settings.notifications_browser === true || settings.notifications_toast !== false);
+  const toastNotifEnabled = (settings.notifications_toast !== false);
+  const alertLimitsRow = root.querySelector('#ux-alert-limits-row');
+  const alertThresholdRow = root.querySelector('#ux-alert-threshold-row');
+  const alertPeakRow = root.querySelector('#ux-alert-peak-row');
+  const toastPositionRow = root.querySelector('#ux-toast-position-row');
+
+  if (alertLimitsRow) alertLimitsRow.style.display = anyNotifEnabled ? 'flex' : 'none';
+  if (alertThresholdRow) alertThresholdRow.style.display = anyNotifEnabled ? 'flex' : 'none';
+  if (alertPeakRow) alertPeakRow.style.display = anyNotifEnabled ? 'flex' : 'none';
+  if (toastPositionRow) {
+    toastPositionRow.style.display = toastNotifEnabled ? 'flex' : 'none';
+    const currentPos = settings.toast_position || 'bottom-right';
+    toastPositionRow.querySelectorAll('.ux-toast-pos-btn').forEach(btn => {
+      if (btn.dataset.value === currentPos) {
+        btn.classList.add('ux-active');
+      } else {
+        btn.classList.remove('ux-active');
+      }
+    });
+  }
+
+  const toastContainer = document.getElementById('ux-toast-container');
+  if (toastContainer) {
+    toastContainer.className = `ux-toast-pos-${settings.toast_position || 'bottom-right'}`;
+  }
 
   // Update custom sidebar side dropdown label
   const currentSide = settings.sidebar_side || 'left';
@@ -1171,6 +1247,7 @@ async function updateUI() {
     }
   }
   updatePeakClock();
+  checkToastAlerts(sessionPct, weeklyPct, usageRateState, settings);
 }
 
 // ─── Peak Hours Clock ──────────────────────────────────────────────────────────
@@ -1272,6 +1349,188 @@ function updatePeakClock() {
   if (track) track.setAttribute('data-tooltip', tooltip);
 }
 
+// ─── Toast icon SVGs ───────────────────────────────────────────────────────────
+
+const UX_TOAST_ICONS = {
+  warning: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+  lock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`,
+  flame: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`,
+  check: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`,
+  clock: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+  moon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`,
+};
+
+function _resolveToastIcon(title, type) {
+  const t = (title || '').toLowerCase();
+  if (t.includes('limit') || t.includes('locked') || t.includes('reached')) return UX_TOAST_ICONS.lock;
+  if (t.includes('burn') || t.includes('burning')) return UX_TOAST_ICONS.flame;
+  if (t.includes('off-peak') || t.includes('ended')) return UX_TOAST_ICONS.moon;
+  if (t.includes('peak hour') || t.includes('approaching')) return UX_TOAST_ICONS.clock;
+  if (t.includes('safe') || t.includes('stabilized') || t.includes('pace')) return UX_TOAST_ICONS.check;
+  if (type === 'red') return UX_TOAST_ICONS.lock;
+  if (type === 'green') return UX_TOAST_ICONS.check;
+  return UX_TOAST_ICONS.warning;
+}
+
+function _dismissToast(toast, timer) {
+  if (!toast || toast.classList.contains('ux-toast-exit')) return;
+  if (timer) clearTimeout(timer);
+  toast.classList.add('ux-toast-exit');
+  setTimeout(() => {
+    toast.remove();
+    const container = document.getElementById('ux-toast-container');
+    if (container && container.children.length === 0) container.remove();
+  }, 300);
+}
+
+function showToast(title, body, type = 'info') {
+  browser.storage.local.get('settings').then((res) => {
+    const settings = res.settings || {};
+    if (settings.notifications_toast === false) return;
+
+    let container = document.getElementById('ux-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'ux-toast-container';
+      document.body.appendChild(container);
+    }
+    const pos = settings.toast_position || 'bottom-right';
+    container.className = `ux-toast-pos-${pos}`;
+
+    // Max 3 toasts visible — evict oldest if needed
+    const visible = container.querySelectorAll('.ux-toast:not(.ux-toast-exit)');
+    if (visible.length >= 3) _dismissToast(visible[visible.length - 1]);
+
+    const iconSvg = _resolveToastIcon(title, type);
+
+    const toast = document.createElement('div');
+    toast.className = `ux-toast ux-toast-${type}`;
+    toast.setAttribute('role', 'status');
+    toast.setAttribute('aria-live', 'polite');
+
+    toast.innerHTML = `
+      <div class="ux-toast-icon" aria-hidden="true">${iconSvg}</div>
+      <div class="ux-toast-body">
+        <p class="ux-toast-title">${title}</p>
+        <p class="ux-toast-sub">${body}</p>
+      </div>
+      <button class="ux-toast-close" aria-label="Dismiss notification" title="Dismiss">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <div class="ux-toast-timer">
+        <div class="ux-toast-timer-fill"></div>
+      </div>
+    `;
+
+    container.prepend(toast);
+
+    const TOAST_DURATION = 5000;
+    let toastStart = Date.now();
+    let elapsedBeforeHover = 0;
+    let dismissTimer = setTimeout(() => _dismissToast(toast), TOAST_DURATION);
+
+    toast.querySelector('.ux-toast-close').addEventListener('click', () => {
+      _dismissToast(toast, dismissTimer);
+    });
+
+    toast.addEventListener('mouseenter', () => {
+      // Snapshot how much time has elapsed so far, then freeze everything
+      elapsedBeforeHover += Date.now() - toastStart;
+      clearTimeout(dismissTimer);
+      dismissTimer = null;
+      const fill = toast.querySelector('.ux-toast-timer-fill');
+      if (fill) fill.style.animationPlayState = 'paused';
+    });
+    toast.addEventListener('mouseleave', () => {
+      // Resume the CSS bar from its frozen frame, schedule dismissal for remaining time
+      toastStart = Date.now();
+      const remaining = Math.max(0, TOAST_DURATION - elapsedBeforeHover);
+      const fill = toast.querySelector('.ux-toast-timer-fill');
+      if (fill) fill.style.animationPlayState = 'running';
+      dismissTimer = setTimeout(() => _dismissToast(toast), remaining);
+    });
+
+  }).catch((err) => {
+    console.error('[UsageX] Error showing toast:', err);
+  });
+}
+
+function checkToastAlerts(sessionPct, weeklyPct, usageRateState, settings) {
+  // Check limit threshold alerts
+  if (settings.alert_usage_threshold !== false) {
+    // 100% lockout warning
+    if ((sessionPct != null && sessionPct >= 100) || (weeklyPct != null && weeklyPct >= 100)) {
+      if (!alertedFlags.limitReached) {
+        showToast("Usage Limit Reached", "You have consumed 100% of your Claude quota. Please wait for the reset.", "red");
+        alertedFlags.limitReached = true;
+      }
+    } else {
+      alertedFlags.limitReached = false;
+    }
+
+    // 80% Session usage warning
+    if (sessionPct != null && sessionPct >= 80 && sessionPct < 100) {
+      if (!alertedFlags.session80) {
+        showToast("High Session Usage", `Session usage is at ${Math.round(sessionPct)}%. Consider lowering your effort level.`, "yellow");
+        alertedFlags.session80 = true;
+      }
+    } else if (sessionPct != null && sessionPct < 80) {
+      alertedFlags.session80 = false;
+    }
+
+    // 80% Weekly usage warning
+    if (weeklyPct != null && weeklyPct >= 80 && weeklyPct < 100) {
+      if (!alertedFlags.weekly80) {
+        showToast("High Weekly Usage", `Weekly usage is at ${Math.round(weeklyPct)}%. You are close to your weekly limit.`, "yellow");
+        alertedFlags.weekly80 = true;
+      }
+    } else if (weeklyPct != null && weeklyPct < 80) {
+      alertedFlags.weekly80 = false;
+    }
+  }
+
+  // Check limits reset / pace alerts
+  if (settings.alert_limits_reset !== false) {
+    if (usageRateState !== 'gray') {
+      if (alertedFlags.usageRateState !== usageRateState) {
+        if (usageRateState === 'extreme') {
+          showToast("Burning Fast!", "You're consuming tokens at an extreme rate. Try lowering Claude's thinking effort.", "yellow");
+        } else if (usageRateState === 'down' && alertedFlags.usageRateState != null) {
+          showToast("Pace Stabilized", "Your usage rate is below budget. Good pace!", "green");
+        }
+        alertedFlags.usageRateState = usageRateState;
+      }
+    }
+  }
+
+  // Check Peak hours alerts
+  if (settings.alert_peak_hours !== false) {
+    const { h, m, dayOfWeek } = getPeakClockIST();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+    const curH = h + m / 60;
+    const inPeak = !isWeekend && (curH >= 18.5 || curH < 0.5);
+    const peakApproaching = !isWeekend && (curH >= 18.25 && curH < 18.5);
+
+    if (alertedFlags.peakHoursState !== null && alertedFlags.peakHoursState !== inPeak) {
+      if (inPeak) {
+        showToast("Peak Hours Started", "Claude limits deplete faster during peak traffic (6:30 PM - 12:30 AM IST).", "yellow");
+      } else {
+        showToast("Peak Hours Ended", "Claude has exited peak hours. Good time to prompt!", "green");
+      }
+    }
+    alertedFlags.peakHoursState = inPeak;
+
+    if (peakApproaching) {
+      if (!alertedFlags.peakHoursApproaching) {
+        showToast("Peak Hours Approaching", "Peak hours will start in 15 minutes (6:30 PM IST). Limits will deplete faster.", "yellow");
+        alertedFlags.peakHoursApproaching = true;
+      }
+    } else {
+      alertedFlags.peakHoursApproaching = false;
+    }
+  }
+}
+
 function setEl(sel, text) {
   const root = document.getElementById(UX_ID);
   if (!root) return;
@@ -1310,7 +1569,7 @@ function bindEvents() {
 
   root.querySelector('#ux-btn-settings')?.addEventListener('click', () => {
     root.classList.toggle('ux-settings-open');
-    updateUI().catch(() => {});
+    updateUI().catch(() => { });
   });
 
   // Settings back → main view
@@ -1339,9 +1598,66 @@ function bindEvents() {
     await saveSettings({ debug_logging: e.target.checked });
   });
 
+  root.querySelector('#ux-setting-notifications-browser')?.addEventListener('change', async (e) => {
+    await saveSettings({ notifications_browser: e.target.checked });
+    updateUI().catch(() => { });
+  });
+
+  root.querySelector('#ux-setting-notifications-toast')?.addEventListener('change', async (e) => {
+    await saveSettings({ notifications_toast: e.target.checked });
+    updateUI().catch(() => { });
+  });
+
+  root.querySelectorAll('.ux-toast-pos-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      const pos = e.currentTarget.dataset.value;
+      await saveSettings({ toast_position: pos });
+      updateUI().catch(() => { });
+    });
+  });
+
+  root.querySelector('#ux-setting-alert-limits-reset')?.addEventListener('change', async (e) => {
+    await saveSettings({ alert_limits_reset: e.target.checked });
+  });
+
+  root.querySelector('#ux-setting-alert-usage-threshold')?.addEventListener('change', async (e) => {
+    await saveSettings({ alert_usage_threshold: e.target.checked });
+  });
+
+  root.querySelector('#ux-setting-alert-peak-hours')?.addEventListener('change', async (e) => {
+    await saveSettings({ alert_peak_hours: e.target.checked });
+  });
+
+  root.querySelector('#ux-notifications-header')?.addEventListener('click', () => {
+    const sec = root.querySelector('#ux-section-notifications');
+    if (sec) {
+      sec.classList.toggle('ux-section-collapsed');
+    }
+  });
+
+  // Test Toast button — cycles through all toast variants
+  (() => {
+    const testToasts = [
+      { title: 'High Session Usage', body: 'Session usage is at 82%. Consider lowering your effort level.', type: 'yellow' },
+      { title: 'Burning Fast!', body: "You're consuming tokens at an extreme rate. Try lowering Claude's thinking effort.", type: 'yellow' },
+      { title: 'Usage Limit Reached', body: 'You have consumed 100% of your Claude quota. Please wait for the reset.', type: 'red' },
+      { title: 'Peak Hours Started', body: 'Claude limits deplete faster during peak traffic (6:30 PM – 12:30 AM IST).', type: 'yellow' },
+      { title: 'Peak Hours Approaching', body: 'Peak hours will start in 15 minutes (6:30 PM IST). Limits will deplete faster.', type: 'yellow' },
+      { title: 'Peak Hours Ended', body: 'Claude has exited peak hours. Good time to prompt!', type: 'green' },
+      { title: 'Pace Stabilized', body: 'Your usage rate is below budget. Good pace!', type: 'green' },
+    ];
+    let testIdx = 0;
+    root.querySelector('#ux-btn-test-toast')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const t = testToasts[testIdx % testToasts.length];
+      showToast(t.title, t.body, t.type);
+      testIdx++;
+    });
+  })();
+
   root.querySelector('#ux-setting-floating-opacity-enabled')?.addEventListener('change', async (e) => {
     await saveSettings({ floating_opacity_enabled: e.target.checked });
-    updateUI().catch(() => {});
+    updateUI().catch(() => { });
   });
 
   root.querySelector('#ux-setting-opacity-slider')?.addEventListener('input', (e) => {
@@ -1384,7 +1700,7 @@ function bindEvents() {
           root.classList.remove('ux-side-right');
         }
       }
-      updateUI().catch(() => {});
+      updateUI().catch(() => { });
     });
     document.addEventListener('click', (e) => {
       if (!sideWrap.contains(e.target)) sideWrap.classList.remove('ux-csel-open');
@@ -1406,7 +1722,7 @@ function bindEvents() {
       if (!opt) return;
       await saveSettings({ timezone: opt.dataset.value });
       tzWrap.classList.remove('ux-csel-open');
-      updateUI().catch(() => {});
+      updateUI().catch(() => { });
     });
     document.addEventListener('click', (e) => {
       if (!tzWrap.contains(e.target)) tzWrap.classList.remove('ux-csel-open');
@@ -1423,7 +1739,7 @@ function bindEvents() {
       const fx = s.float_x != null ? s.float_x : window.innerWidth - 266;
       const fy = s.float_y != null ? s.float_y : window.innerHeight - 200;
       root.style.left = fx + 'px';
-      root.style.top  = fy + 'px';
+      root.style.top = fy + 'px';
       root.classList.add('ux-floating');
       root.classList.remove('ux-side-right'); // Clean up sidebar side classes when entering float mode
       document.body.appendChild(root); // moves node — no clone
@@ -1431,7 +1747,7 @@ function bindEvents() {
       // Move back into sidebar
       root.classList.remove('ux-floating');
       root.style.left = '';
-      root.style.top  = '';
+      root.style.top = '';
       const s = await getSettings();
       if (s.sidebar_side === 'right') {
         root.classList.add('ux-side-right');
@@ -1447,7 +1763,7 @@ function bindEvents() {
       }
     }
     setupSidebarResizeObserver(root);
-    updateUI().catch(() => {});
+    updateUI().catch(() => { });
   });
 
   root.querySelector('#ux-btn-reset')?.addEventListener('click', async () => {
@@ -1482,10 +1798,10 @@ function bindEvents() {
 
     dragMoveHandler = (e) => {
       if (!dragging) return;
-      const nx = Math.max(0, Math.min(window.innerWidth  - root.offsetWidth,  e.clientX - ox));
+      const nx = Math.max(0, Math.min(window.innerWidth - root.offsetWidth, e.clientX - ox));
       const ny = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, e.clientY - oy));
       root.style.left = nx + 'px';
-      root.style.top  = ny + 'px';
+      root.style.top = ny + 'px';
     };
 
     dragUpHandler = async () => {
@@ -1504,7 +1820,7 @@ function bindEvents() {
   root.querySelector('#ux-setting-resize')?.addEventListener('change', async (e) => {
     const enable = e.target.checked;
     await saveSettings({ resizable: enable });
-    updateUI().catch(() => {});
+    updateUI().catch(() => { });
   });
 
   const handleLeft = root.querySelector('#ux-resize-handle-left');
@@ -1524,11 +1840,11 @@ function bindEvents() {
       startWidth = root.offsetWidth;
       startX = e.clientX;
       startLeft = parseFloat(root.style.left) || root.getBoundingClientRect().left;
-      
+
       root.style.transition = 'none';
       const handle = side === 'left' ? handleLeft : handleRight;
       handle.classList.add('ux-resizing-active');
-      
+
       e.preventDefault();
       e.stopPropagation();
     };
@@ -1557,7 +1873,7 @@ function bindEvents() {
       root.style.transition = '';
       handleLeft.classList.remove('ux-resizing-active');
       handleRight.classList.remove('ux-resizing-active');
-      
+
       const w = parseInt(root.style.width, 10);
       const l = parseInt(root.style.left, 10);
       await saveSettings({ float_width: w, float_x: l });
@@ -1794,6 +2110,76 @@ function getSidebarHTML() {
               <div class="ux-csel-option" data-value="AEST">AEST (UTC+10)</div>
               <div class="ux-csel-option" data-value="NZST">NZST (UTC+12)</div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ux-settings-section ux-collapsible-section ux-section-collapsed" id="ux-section-notifications">
+        <div class="ux-section-header" id="ux-notifications-header">
+          <div class="ux-settings-section-title" style="margin: 0; padding-bottom: 0;">Notifications</div>
+          <button class="ux-section-toggle-btn" id="ux-notifications-toggle-btn" type="button" aria-label="Toggle notifications section">
+            <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+        </div>
+        
+        <div class="ux-section-body" id="ux-notifications-body">
+          <div class="ux-setting-row" style="margin-top: 8px;">
+            <span class="ux-setting-label">System Notifications</span>
+            <label class="ux-toggle">
+              <input type="checkbox" id="ux-setting-notifications-browser">
+              <span class="ux-toggle-track"></span>
+            </label>
+          </div>
+          
+          <div class="ux-setting-row">
+            <span class="ux-setting-label">In-Page Toast Alerts</span>
+            <label class="ux-toggle">
+              <input type="checkbox" id="ux-setting-notifications-toast">
+              <span class="ux-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="ux-setting-row ux-setting-row-sub" id="ux-toast-position-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
+            <span class="ux-setting-label">Toast Position</span>
+            <div class="ux-toast-position-grid">
+              <button class="ux-toast-pos-btn" data-value="top-left" title="Top Left" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="top-right" title="Top Right" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="bottom-left" title="Bottom Left" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="bottom-right" title="Bottom Right" type="button"></button>
+            </div>
+          </div>
+
+          <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-limits-row">
+            <span class="ux-setting-label">Alert when limits reset</span>
+            <label class="ux-toggle">
+              <input type="checkbox" id="ux-setting-alert-limits-reset">
+              <span class="ux-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-threshold-row">
+            <span class="ux-setting-label">Alert when usage exceeds 80%</span>
+            <label class="ux-toggle">
+              <input type="checkbox" id="ux-setting-alert-usage-threshold">
+              <span class="ux-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-peak-row">
+            <span class="ux-setting-label">Alert during Peak Hours</span>
+            <label class="ux-toggle">
+              <input type="checkbox" id="ux-setting-alert-peak-hours">
+              <span class="ux-toggle-track"></span>
+            </label>
+          </div>
+
+          <div class="ux-setting-row" style="margin-top: 6px; border-top: 1px solid var(--ux-border-subtle); padding-top: 8px;">
+            <span class="ux-setting-label" style="color: var(--ux-text-3); font-size: 10.5px;">Preview a sample notification</span>
+            <button class="ux-settings-btn" id="ux-btn-test-toast" type="button" style="width: auto; padding: 4px 10px; font-size: 11px; flex-shrink: 0;">
+              Test Toast
+            </button>
           </div>
         </div>
       </div>
@@ -2323,6 +2709,63 @@ function getCSS() {
   border-bottom: none;
 }
 .ux-setting-label { font-size: 13px; font-weight: 500; color: var(--ux-text-2); }
+.ux-toast-position-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  width: 100%;
+  max-width: 140px;
+  margin-top: 4px;
+}
+.ux-toast-pos-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--ux-border-subtle);
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+.ux-toast-pos-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.ux-toast-pos-btn.ux-active {
+  background: rgba(240, 165, 0, 0.1);
+  border-color: #f0a500;
+}
+.ux-toast-pos-btn::before {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #706860;
+  transition: background 0.2s;
+}
+.ux-toast-pos-btn.ux-active::before {
+  background: #f0a500;
+}
+.ux-toast-pos-btn[data-value="top-left"]::before {
+  top: 6px;
+  left: 6px;
+}
+.ux-toast-pos-btn[data-value="top-right"]::before {
+  top: 6px;
+  right: 6px;
+}
+.ux-toast-pos-btn[data-value="bottom-left"]::before {
+  bottom: 6px;
+  left: 6px;
+}
+.ux-toast-pos-btn[data-value="bottom-right"]::before {
+  bottom: 6px;
+  right: 6px;
+}
 .ux-shortcut-footer {
   margin-top: 16px;
   font-size: 11px;
@@ -2647,6 +3090,278 @@ function getCSS() {
 .ux-resize-edge-handle.ux-resizing-active::after {
   opacity: 0.6;
 }
+
+/* Collapsible Settings Sections */
+.ux-collapsible-section .ux-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+.ux-collapsible-section .ux-section-header:hover .ux-settings-section-title {
+  color: var(--ux-text-1);
+}
+.ux-collapsible-section .ux-section-toggle-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ux-text-3);
+  transition: color 0.15s;
+}
+.ux-collapsible-section .ux-section-toggle-btn:hover {
+  color: var(--ux-text-1);
+}
+.ux-collapsible-section .ux-chevron-icon {
+  transform: rotate(0deg);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  color: inherit;
+}
+.ux-collapsible-section.ux-section-collapsed .ux-chevron-icon {
+  transform: rotate(-90deg);
+}
+.ux-collapsible-section .ux-section-body {
+  max-height: 500px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-height 0.25s ease-out, opacity 0.2s ease-in, margin-top 0.25s;
+}
+.ux-collapsible-section.ux-section-collapsed .ux-section-body {
+  max-height: 0 !important;
+  opacity: 0;
+  pointer-events: none;
+  margin-top: 0 !important;
+}
+
+/* ── Toast Notifications — UsageX sidebar-matched, icon-only signal ── */
+#ux-toast-container {
+  position: fixed;
+  bottom: 28px;
+  right: 24px;
+  top: auto;
+  left: auto;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  pointer-events: none;
+  font-family: inherit;
+  max-width: 310px;
+  width: 310px;
+}
+#ux-toast-container.ux-toast-pos-top-right {
+  top: 28px;
+  right: 24px;
+  bottom: auto;
+  left: auto;
+  flex-direction: column;
+}
+#ux-toast-container.ux-toast-pos-bottom-right {
+  bottom: 28px;
+  right: 24px;
+  top: auto;
+  left: auto;
+  flex-direction: column-reverse;
+}
+#ux-toast-container.ux-toast-pos-top-left {
+  top: 28px;
+  left: 24px;
+  bottom: auto;
+  right: auto;
+  flex-direction: column;
+}
+#ux-toast-container.ux-toast-pos-bottom-left {
+  bottom: 28px;
+  left: 24px;
+  top: auto;
+  right: auto;
+  flex-direction: column-reverse;
+}
+
+.ux-toast {
+  pointer-events: auto;
+  position: relative;
+  width: 100%;
+  border-radius: 9px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 13px 15px 13px;
+  box-sizing: border-box;
+  background: #1a1916;
+  border: 0.5px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.5), 0 6px 20px rgba(0,0,0,0.4);
+  animation: ux-toast-in 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html.light .ux-toast,
+body.light .ux-toast {
+  background: #faf9f5;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  html:not(.dark) .ux-toast,
+  body:not(.dark) .ux-toast {
+    background: #faf9f5;
+    border: 0.5px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.04), 0 6px 20px rgba(0,0,0,0.08);
+  }
+}
+
+/* Icon-only color signal — no stripe pseudo-element */
+
+.ux-toast-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ux-toast-acc);
+}
+
+.ux-toast-icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.ux-toast-body {
+  flex: 1;
+  min-width: 0;
+  padding-right: 16px;
+}
+
+.ux-toast-title {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  color: #e8e2d9;
+  margin: 0 0 2px 0;
+}
+
+.ux-toast-sub {
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: #706860;
+  margin: 0;
+}
+
+html.light .ux-toast-title,
+body.light .ux-toast-title {
+  color: #141413;
+}
+
+html.light .ux-toast-sub,
+body.light .ux-toast-sub {
+  color: #6c6a64;
+}
+
+@media (prefers-color-scheme: light) {
+  html:not(.dark) .ux-toast-title,
+  body:not(.dark) .ux-toast-title { color: #141413; }
+  html:not(.dark) .ux-toast-sub,
+  body:not(.dark) .ux-toast-sub   { color: #6c6a64; }
+}
+
+.ux-toast-close {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  background: none;
+  border: none;
+  padding: 3px;
+  cursor: pointer;
+  color: #4a4845;
+  line-height: 1;
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ux-toast:hover .ux-toast-close { opacity: 1; }
+.ux-toast-close:hover { color: #c8c2b8; }
+html.light .ux-toast-close:hover,
+body.light .ux-toast-close:hover { color: #141413; }
+
+.ux-toast-timer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 0 0 9px 9px;
+  overflow: hidden;
+}
+
+.ux-toast-timer-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--ux-toast-acc);
+  opacity: 0.4;
+  transform-origin: left;
+  animation: ux-toast-countdown 5s linear forwards;
+}
+
+/* Type accent tokens — vivid, sidebar-matched */
+.ux-toast-yellow { --ux-toast-acc: #f0a500; }
+.ux-toast-red    { --ux-toast-acc: #f05a5a; }
+.ux-toast-green  { --ux-toast-acc: #4ade80; }
+.ux-toast-info   { --ux-toast-acc: #60a5fa; }
+
+/* Animations — right → left entry, left → right exit */
+@keyframes ux-toast-in {
+  from { opacity: 0; transform: translateX(48px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+
+@keyframes ux-toast-countdown {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
+
+.ux-toast.ux-toast-exit {
+  animation: ux-toast-out 0.28s cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+@keyframes ux-toast-out {
+  from { opacity: 1; transform: translateX(0);     max-height: 120px; margin-bottom: 0; }
+  to   { opacity: 0; transform: translateX(48px);  max-height: 0;     margin-bottom: -8px; padding-top: 0; padding-bottom: 0; }
+}
+
+#ux-toast-container.ux-toast-pos-top-left .ux-toast,
+#ux-toast-container.ux-toast-pos-bottom-left .ux-toast {
+  animation-name: ux-toast-in-left;
+}
+#ux-toast-container.ux-toast-pos-top-left .ux-toast.ux-toast-exit,
+#ux-toast-container.ux-toast-pos-bottom-left .ux-toast.ux-toast-exit {
+  animation-name: ux-toast-out-left;
+}
+
+@keyframes ux-toast-in-left {
+  from { opacity: 0; transform: translateX(-48px); }
+  to   { opacity: 1; transform: translateX(0);    }
+}
+@keyframes ux-toast-out-left {
+  from { opacity: 1; transform: translateX(0);     max-height: 120px; margin-bottom: 0; }
+  to   { opacity: 0; transform: translateX(-48px); max-height: 0;     margin-bottom: -8px; padding-top: 0; padding-bottom: 0; }
+}
   `;
 }
 
@@ -2655,7 +3370,7 @@ function getCSS() {
 async function fetchUsageLimitsActive() {
   try {
     let orgId = document.cookie.split('; ').find(row => row.startsWith('lastActiveOrg='))?.split('=')[1] || null;
-    
+
     if (!orgId) {
       const orgsRes = await fetch('/api/organizations');
       if (!orgsRes.ok) {
@@ -2669,19 +3384,19 @@ async function fetchUsageLimitsActive() {
       }
       orgId = orgs[0].uuid;
     }
-    
+
     if (!orgId) {
       await debugLog('active_fetch_failed', { reason: 'no_orgId' });
       return;
     }
-    
+
     const usageRes = await fetch(`/api/organizations/${orgId}/usage`);
     if (!usageRes.ok) {
       await debugLog('active_fetch_failed', { status: usageRes.status, stage: 'usage', orgId });
       return;
     }
     const json = await usageRes.json();
-    
+
     if (json.five_hour || json.seven_day) {
       const data = {
         session_pct: json.five_hour ? (json.five_hour.utilization ?? null) : null,
@@ -2711,7 +3426,7 @@ function pollUsageLimits() {
 async function init() {
   injectFetchHook();
   setupKeyboardShortcut();
-  await fetchUsageLimitsActive().catch(() => {});
+  await fetchUsageLimitsActive().catch(() => { });
 
   let attempts = 0;
   tryInjectInterval = setInterval(async () => {

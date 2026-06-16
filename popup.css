@@ -419,3 +419,68 @@ kbd {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #444; }
+
+/* ─── Custom CSS Tooltips ───────────────────────────────────── */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-3px);
+  background: rgba(26, 26, 26, 0.95);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #e0e0e0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 15px;
+  display: block;
+  box-sizing: border-box;
+  padding: 5px 10px;
+  border-radius: 6px;
+  white-space: normal;
+  width: max-content;
+  max-width: 260px;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  z-index: 9999;
+  border: 1px solid #333;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  font-family: var(--px-font);
+  letter-spacing: 0.01em;
+  text-align: center;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Align tooltips to appear above for tracks */
+.px-track[data-tooltip] {
+  overflow: visible;
+  cursor: help;
+}
+.px-track[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+}
+.px-track[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Align tooltip to appear above for rate dot */
+.px-rate-dot[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+}
+.px-rate-dot[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}

@@ -46,6 +46,25 @@ function getThresholdColor(pct) {
   return '#4ade80';
 }
 
+const SESSION_TOKEN_LIMIT = 375000;
+const WEEKLY_TOKEN_LIMIT = 3750000;
+
+function formatTokenCount(value) {
+  return new Intl.NumberFormat('en-IN').format(Math.max(0, Math.round(value || 0)));
+}
+
+function getSessionTooltipText(sessionPct) {
+  if (sessionPct == null) return '';
+  const used = Math.round((Number(sessionPct) / 100) * SESSION_TOKEN_LIMIT);
+  return `${formatTokenCount(used)} / ${formatTokenCount(SESSION_TOKEN_LIMIT)} tokens (${Math.round(sessionPct)}%)`;
+}
+
+function getWeeklyTooltipText(weeklyPct) {
+  if (weeklyPct == null) return '';
+  const used = Math.round((Number(weeklyPct) / 100) * WEEKLY_TOKEN_LIMIT);
+  return `${formatTokenCount(used)} / ${formatTokenCount(WEEKLY_TOKEN_LIMIT)} tokens (${Math.round(weeklyPct)}%)`;
+}
+
 function getPeakStatus() {
   const now  = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
@@ -128,12 +147,22 @@ async function refreshDashboard() {
 
   // ── Status banner + live dot ──
   const { inPeak } = getPeakStatus();
-  const hasData = limits.session_pct != null;
+  
+  let onClaude = false;
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tabs && tabs[0] && tabs[0].url) {
+      const url = tabs[0].url;
+      if (url.includes('claude.ai')) {
+        onClaude = true;
+      }
+    }
+  } catch (_) {}
 
   const bannerEl  = el('px-status-banner');
   const statusTxt = el('px-status-text');
   if (bannerEl && statusTxt) {
-    if (hasData) {
+    if (onClaude) {
       bannerEl.className = 'px-status-banner px-status-active';
       statusTxt.textContent = 'Sidebar active on Claude.ai';
     } else {
@@ -170,6 +199,21 @@ async function refreshDashboard() {
   const weeklyBar = el('px-bar-weekly');
   if (weeklyBar) weeklyBar.style.background = getThresholdColor(weeklyPct) || '#4ade80';
 
+  // ── Tooltips for tracks ──
+  const sessionTrack = el('px-track-session');
+  if (sessionTrack && sessionPct != null) {
+    sessionTrack.setAttribute('data-tooltip', getSessionTooltipText(sessionPct));
+  } else if (sessionTrack) {
+    sessionTrack.removeAttribute('data-tooltip');
+  }
+
+  const weeklyTrack = el('px-track-weekly');
+  if (weeklyTrack && weeklyPct != null) {
+    weeklyTrack.setAttribute('data-tooltip', getWeeklyTooltipText(weeklyPct));
+  } else if (weeklyTrack) {
+    weeklyTrack.removeAttribute('data-tooltip');
+  }
+
   // ── Rate dot ──
   const rateDot = el('px-rate-dot');
   if (rateDot) {
@@ -182,7 +226,8 @@ async function refreshDashboard() {
       down:    'Below normal <19%/h — good!',
       gray:    'Calculating…',
     };
-    rateDot.title = labels[state] || 'Calculating…';
+    rateDot.setAttribute('data-tooltip', labels[state] || 'Calculating…');
+    rateDot.removeAttribute('title');
   }
 
   // ── Reset times ──
