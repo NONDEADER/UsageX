@@ -22,7 +22,7 @@
   --px-radius:        8px;
   --px-radius-sm:     5px;
 
-  --px-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --px-font: "Inter", "Styrene B Web", "Styrene B", "Styrene A Web", "Styrene A", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body {

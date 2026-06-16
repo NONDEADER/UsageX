@@ -265,7 +265,14 @@ async function resetTodayStats() {
   const histRes = await browser.storage.local.get('history');
   await browser.storage.local.set({ today: freshToday(), history: histRes.history || [] });
   await refreshDashboard();
-  showFeedback('px-action-feedback', '✓ Today\'s stats reset');
+  showFeedback('px-action-feedback', '✓ Daily counters reset');
+}
+
+async function clearDebugLogs() {
+  await browser.storage.local.set({ debug_logs: [] });
+  const badge = el('px-debug-badge');
+  if (badge) badge.textContent = '0';
+  showFeedback('px-action-feedback', '✓ Debug logs cleared');
 }
 
 function initTools() {
@@ -280,8 +287,14 @@ function initTools() {
   });
 
   el('px-btn-reset')?.addEventListener('click', async () => {
-    if (confirm('Reset all of today\'s stats? This cannot be undone.')) {
+    if (confirm('Reset daily counters (messages, time, tokens)? Session & weekly % are unaffected. This cannot be undone.')) {
       await resetTodayStats();
+    }
+  });
+
+  el('px-btn-clear-logs')?.addEventListener('click', async () => {
+    if (confirm('Clear all debug logs? This cannot be undone.')) {
+      await clearDebugLogs();
     }
   });
 }
