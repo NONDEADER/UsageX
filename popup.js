@@ -329,6 +329,24 @@ async function init() {
   initTools();
   initOpenClaude();
   await refreshDashboard();
+
+  // Auto-switch to a specific tab if requested via URL param or storage flag
+  const urlParam = new URLSearchParams(location.search).get('tab');
+  let targetTab = urlParam || null;
+
+  if (!targetTab) {
+    // Check storage flag set by the sidebar "Help & Guide" button
+    const flagRes = await browser.storage.local.get('_open_help_tab');
+    if (flagRes._open_help_tab) {
+      targetTab = 'help';
+      await browser.storage.local.remove('_open_help_tab');
+    }
+  }
+
+  if (targetTab) {
+    const btn = document.getElementById(`tab-${targetTab}`);
+    if (btn) btn.click();
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);

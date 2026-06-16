@@ -1776,6 +1776,37 @@ function bindEvents() {
     await updateUI();
   });
 
+  root.querySelector('#ux-btn-open-help')?.addEventListener('click', async () => {
+    try {
+      // Signal to the popup that it should open on the Help tab
+      await browser.storage.local.set({ _open_help_tab: true });
+      
+      // Attempt to open the actual extension popup via background script
+      const response = await new Promise((resolve) => {
+        browser.runtime.sendMessage({ action: 'OPEN_HELP_POPUP' }, (res) => {
+          if (browser.runtime.lastError) {
+            resolve({ success: false, error: browser.runtime.lastError.message });
+          } else {
+            resolve(res || { success: false });
+          }
+        });
+      });
+
+      if (!response || !response.success) {
+        console.warn('[UsageX] Failed to open popup UI via background script. Error:', response?.error || 'unknown');
+        // Open the popup page directly in a new tab as a reliable fallback
+        const popupUrl = browser.runtime.getURL('popup.html') + '?tab=help';
+        browser.tabs.create({ url: popupUrl });
+      }
+    } catch (err) {
+      console.error('[UsageX] Error during open-help click:', err);
+      try {
+        const popupUrl = browser.runtime.getURL('popup.html') + '?tab=help';
+        browser.tabs.create({ url: popupUrl });
+      } catch (_) {}
+    }
+  });
+
   // Draggable headers (active on home screen, settings screen, or advanced screen when floating)
   const handles = root.querySelectorAll('#ux-drag-handle, .ux-settings-header');
   if (handles.length > 0) {
@@ -2215,6 +2246,13 @@ function getSidebarHTML() {
 
     <div class="ux-shortcut-footer">
       Press <kbd>Alt</kbd>+<kbd>U</kbd> to toggle panel
+    </div>
+    <div class="ux-help-footer">
+      <button class="ux-help-footer-btn" id="ux-btn-open-help" type="button">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Help &amp; Guide
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </button>
     </div>
   </div>
   <div id="ux-resize-handle-left" class="ux-resize-edge-handle ux-resize-edge-left" style="display: none;"></div>
@@ -3361,6 +3399,34 @@ body.light .ux-toast-close:hover { color: #141413; }
 @keyframes ux-toast-out-left {
   from { opacity: 1; transform: translateX(0);     max-height: 120px; margin-bottom: 0; }
   to   { opacity: 0; transform: translateX(-48px); max-height: 0;     margin-bottom: -8px; padding-top: 0; padding-bottom: 0; }
+}
+
+/* ─── Help footer ─────────────────────────────────────────── */
+.ux-help-footer {
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--ux-border-subtle);
+  margin-top: 2px;
+}
+.ux-help-footer-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  background: rgba(204,153,102,0.08);
+  border: 1px solid rgba(204,153,102,0.2);
+  border-radius: var(--ux-radius);
+  color: var(--ux-accent);
+  font-size: 11.5px;
+  font-weight: 600;
+  font-family: var(--ux-font);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ux-help-footer-btn:hover {
+  background: rgba(204,153,102,0.16);
+  border-color: rgba(204,153,102,0.38);
 }
   `;
 }

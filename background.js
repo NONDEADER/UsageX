@@ -183,3 +183,44 @@ browser.storage.onChanged.addListener(async (changes, area) => {
     }
   }
 });
+
+// ─── Open popup from sidebar Help button ──────────────────────────────────────
+
+browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && message.action === 'OPEN_HELP_POPUP') {
+    const actionApi = typeof browser !== 'undefined' && browser.action ? browser.action : (typeof chrome !== 'undefined' ? chrome.action : null);
+    
+    if (actionApi && typeof actionApi.openPopup === 'function') {
+      const windowId = sender.tab ? sender.tab.windowId : undefined;
+      const openPromise = windowId !== undefined ? actionApi.openPopup({ windowId }) : actionApi.openPopup();
+      
+      if (openPromise && typeof openPromise.then === 'function') {
+        openPromise
+          .then(() => {
+            sendResponse({ success: true });
+          })
+          .catch((err) => {
+            console.error('[UsageX] openPopup failed:', err);
+            sendResponse({ success: false, error: err.message || String(err) });
+          });
+      } else {
+        try {
+          actionApi.openPopup({ windowId }, () => {
+            const lastError = chrome.runtime.lastError;
+            if (lastError) {
+              console.error('[UsageX] openPopup lastError:', lastError);
+              sendResponse({ success: false, error: lastError.message });
+            } else {
+              sendResponse({ success: true });
+            }
+          });
+        } catch (err) {
+          sendResponse({ success: false, error: err.message || String(err) });
+        }
+      }
+      return true; // Keep message channel open for async response
+    } else {
+      sendResponse({ success: false, error: 'action.openPopup not supported on this browser version' });
+    }
+  }
+});
