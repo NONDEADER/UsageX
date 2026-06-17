@@ -397,17 +397,53 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* ─── Today Meta Row (Feature 6) ───────────────────────────── */
-.px-today-meta {
+/* ─── Today Stat Cards (Feature 6) ─────────────────────────── */
+.px-today-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   margin-top: 8px;
-  padding: 5px 8px;
-  background: var(--px-surface-3);
+}
+.px-today-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  background: var(--px-surface);
+  border: 1px solid var(--px-border);
   border-radius: var(--px-radius-sm);
-  font-size: 10.5px;
-  color: var(--px-text-3);
+  transition: background 0.15s, border-color 0.15s;
+  min-width: 0;
+}
+.px-today-stat:hover {
+  background: var(--px-surface-2);
+  border-color: rgba(204, 153, 102, 0.25);
+}
+.px-today-stat-icon {
+  color: var(--px-accent);
+  opacity: 0.7;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+}
+.px-today-stat-val {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--px-text-1);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-  line-height: 1.4;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.px-today-stat-label {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: var(--px-text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 1px;
 }
 
 /* ─── Tools ─────────────────────────────────────────────────── */

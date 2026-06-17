@@ -296,22 +296,21 @@ async function refreshDashboard() {
     if (count) count.textContent = String(cnt);
   }
 
-  // Feature 6: avg tokens/msg
+  // Feature 6: stat cards
   const msgs      = today.msgs || 0;
   const tokensEst = today.tokens_est || 0;
   const avgTok    = msgs > 0 ? Math.round(tokensEst / msgs) : null;
   const timeStr   = formatDuration(today.time_s);
 
-  const metaEl = el('px-today-meta');
-  if (metaEl) {
-    const parts = [
-      `${msgs} msg${msgs !== 1 ? 's' : ''}`,
-      `${timeStr} active`,
-      `~${formatTokens(tokensEst)} tokens`,
-    ];
-    if (avgTok !== null) parts.push(`~${formatTokens(avgTok)}/msg avg`);
-    metaEl.textContent = parts.join(' · ');
-  }
+  const statMsgs   = el('px-stat-msgs');
+  const statTime   = el('px-stat-time');
+  const statTokens = el('px-stat-tokens');
+  const statAvg    = el('px-stat-avg');
+
+  if (statMsgs)   statMsgs.textContent   = String(msgs);
+  if (statTime)   statTime.textContent   = timeStr || '0m';
+  if (statTokens) statTokens.textContent = `~${formatTokens(tokensEst)}`;
+  if (statAvg)    statAvg.textContent    = avgTok !== null ? `~${formatTokens(avgTok)}` : '—';
 
   // Hide Today section only when there are zero messages AND no limits data yet
   const todaySec = el('px-today-section');

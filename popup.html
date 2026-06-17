@@ -151,8 +151,45 @@
         </div>
       </div>
 
-      <!-- Daily meta row (Feature 6) -->
-      <div class="px-today-meta" id="px-today-meta"></div>
+      <!-- Daily stat cards (Feature 6) -->
+      <div class="px-today-stats" id="px-today-stats">
+        <div class="px-today-stat">
+          <div class="px-today-stat-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+          </div>
+          <div class="px-today-stat-val" id="px-stat-msgs">—</div>
+          <div class="px-today-stat-label">messages</div>
+        </div>
+        <div class="px-today-stat">
+          <div class="px-today-stat-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          </div>
+          <div class="px-today-stat-val" id="px-stat-time">—</div>
+          <div class="px-today-stat-label">active</div>
+        </div>
+        <div class="px-today-stat">
+          <div class="px-today-stat-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+            </svg>
+          </div>
+          <div class="px-today-stat-val" id="px-stat-tokens">—</div>
+          <div class="px-today-stat-label">tokens est.</div>
+        </div>
+        <div class="px-today-stat">
+          <div class="px-today-stat-icon">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+          </div>
+          <div class="px-today-stat-val" id="px-stat-avg">—</div>
+          <div class="px-today-stat-label">avg / msg</div>
+        </div>
+      </div>
     </div>
 
     <!-- Usage Trend Sparkline (Feature 1) -->
