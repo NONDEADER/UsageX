@@ -509,86 +509,233 @@ kbd {
   transform: translateY(0);
 }
 
-/* ─── Help Panel ─────────────────────────────────────────────── */
+/* ─── Guide / Help Panel ────────────────────────────────── */
 #panel-help {
   max-height: 480px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #333 transparent;
+  padding: 10px 12px 16px;
 }
 
-.px-help-body {
-  font-size: 12px;
-  color: var(--px-text-2);
-  line-height: 1.6;
+/* Intro Banner */
+.px-guide-banner {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(204,153,102,0.1) 0%, rgba(204,153,102,0.04) 100%);
+  border: 1px solid rgba(204,153,102,0.22);
+  border-radius: var(--px-radius);
 }
-.px-help-body strong { color: var(--px-accent); font-weight: 600; }
+.px-guide-banner-icon {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(204,153,102,0.12);
+  border: 1px solid rgba(204,153,102,0.2);
+  border-radius: 8px;
+  flex-shrink: 0;
+  color: var(--px-accent);
+}
+.px-guide-banner-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2dd4bf;
+  border: 1.5px solid var(--px-bg);
+  animation: dot-pulse 2.5s ease-in-out infinite;
+}
+.px-guide-banner-text { flex: 1; min-width: 0; }
+.px-guide-banner-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--px-text-1);
+  letter-spacing: -0.01em;
+}
+.px-guide-v { color: var(--px-accent); font-size: 11px; font-weight: 500; }
+.px-guide-banner-sub {
+  font-size: 10.5px;
+  color: var(--px-text-4);
+  margin-top: 1px;
+  line-height: 1.4;
+}
 
-/* List of feature items */
-.px-help-list { display: flex; flex-direction: column; gap: 10px; }
+/* Guide Section */
+.px-guide-section {
+  margin-bottom: 10px;
+}
+.px-guide-section:last-child { margin-bottom: 0; }
 
-.px-help-item {
+.px-guide-section-hd {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--px-text-4);
+  margin-bottom: 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--px-border-subtle);
+}
+.px-guide-section-hd svg { color: var(--px-accent); flex-shrink: 0; }
+.px-guide-hint { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--px-text-4); opacity: 0.7; }
+
+/* Feature Cards */
+.px-guide-cards { display: flex; flex-direction: column; gap: 6px; }
+
+.px-guide-card {
   background: var(--px-surface);
   border: 1px solid var(--px-border-subtle);
   border-radius: var(--px-radius-sm);
   padding: 8px 10px;
-  transition: background 0.15s;
+  transition: background 0.15s, border-color 0.15s;
 }
-.px-help-item:hover { background: var(--px-surface-2); }
+.px-guide-card:hover {
+  background: var(--px-surface-2);
+  border-color: var(--px-border);
+}
 
-.px-help-item-header {
+.px-guide-card-hd {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-bottom: 4px;
+  gap: 8px;
+  margin-bottom: 3px;
 }
-
-.px-help-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.px-help-dot-pulse { animation: dot-pulse 2s ease-in-out infinite; }
-
-.px-help-icon {
-  color: var(--px-accent);
-  flex-shrink: 0;
-}
-
-.px-help-item-title {
+.px-guide-card-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--px-text-1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-
-.px-help-item-desc {
+.px-guide-badge {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--px-text-4);
+  background: var(--px-surface-3);
+  border: 1px solid var(--px-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.px-guide-card-body {
   font-size: 11.5px;
   color: var(--px-text-3);
   line-height: 1.55;
   margin: 0;
 }
 
-/* Rate legend inside a help item */
-.px-help-rate-legend {
+
+/* Color swatch (solid circle) */
+.px-guide-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Icon in card header */
+.px-guide-icon { color: var(--px-accent); flex-shrink: 0; }
+
+/* Live animated dots (mirrors the extension's own dots) */
+.px-guide-live-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.px-guide-dot-teal   { background: #2dd4bf; animation: dot-pulse 2.5s ease-in-out infinite; }
+.px-guide-dot-gray   { background: #64748b; animation: dot-pulse 3s   ease-in-out infinite; }
+.px-guide-dot-amber  { background: #f59e0b; animation: dot-pulse 1.1s ease-in-out infinite; }
+.px-guide-dot-orange { background: #f97316; animation: dot-pulse 0.5s ease-in-out infinite; box-shadow: 0 0 4px rgba(249,115,22,0.5); }
+.px-guide-dot-peak   { background: var(--px-red); animation: dot-pulse 0.9s ease-in-out infinite; }
+
+/* Legend (colour key inside a card) */
+.px-guide-legend {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 6px;
-  padding: 6px 8px;
+  gap: 4px;
+  margin-top: 7px;
+  padding: 7px 8px;
   background: var(--px-surface-3);
   border-radius: var(--px-radius-sm);
 }
-.px-help-rate-row {
+.px-guide-legend-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
+  gap: 7px;
+}
+.px-guide-legend-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--px-text-2);
+  min-width: 38px;
+}
+.px-guide-legend-desc {
+  font-size: 10.5px;
   color: var(--px-text-3);
+  line-height: 1.4;
 }
 
-/* Token estimate note box */
-.px-help-note {
+/* Settings table */
+.px-guide-settings-list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--px-border-subtle);
+  border-radius: var(--px-radius-sm);
+  overflow: hidden;
+}
+.px-guide-setting-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--px-border-subtle);
+  transition: background 0.12s;
+}
+.px-guide-setting-row:last-child { border-bottom: none; }
+.px-guide-setting-row:hover { background: var(--px-surface); }
+.px-guide-setting-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--px-text-2);
+  min-width: 90px;
+  flex-shrink: 0;
+}
+.px-guide-setting-desc {
+  font-size: 11px;
+  color: var(--px-text-3);
+  line-height: 1.5;
+}
+
+/* Keyboard shortcuts */
+.px-guide-shortcuts { display: flex; flex-direction: column; gap: 0; }
+.px-guide-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--px-surface);
+  border: 1px solid var(--px-border-subtle);
+  border-radius: var(--px-radius-sm);
+}
+.px-guide-shortcut-desc { font-size: 12px; color: var(--px-text-2); }
+
+/* Note box (token estimate) */
+.px-guide-note {
   display: flex;
   gap: 8px;
   align-items: flex-start;
@@ -600,27 +747,35 @@ kbd {
   color: var(--px-text-3);
   line-height: 1.55;
 }
-.px-help-note svg { color: var(--px-accent); }
-.px-help-note em { color: var(--px-accent); font-style: normal; }
-.px-help-note strong { color: var(--px-text-2); font-weight: 600; }
+.px-guide-note svg { color: var(--px-accent); flex-shrink: 0; margin-top: 1px; }
+.px-guide-note em { color: var(--px-accent); font-style: normal; font-weight: 600; }
+.px-guide-note strong { color: var(--px-text-2); font-weight: 600; }
 
 /* Privacy checklist */
-.px-help-privacy {
+.px-guide-privacy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  border: 1px solid rgba(74,222,128,0.12);
+  border-radius: var(--px-radius-sm);
+  background: rgba(74,222,128,0.04);
+  overflow: hidden;
 }
-.px-help-privacy-row {
+.px-guide-privacy-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   font-size: 11.5px;
   color: var(--px-text-3);
   line-height: 1.5;
+  padding: 6px 10px;
+  border-bottom: 1px solid rgba(74,222,128,0.08);
+  transition: background 0.12s;
 }
-.px-help-privacy-row svg { flex-shrink: 0; margin-top: 1px; }
-.px-help-privacy-row strong { color: var(--px-text-2); font-weight: 600; }
-.px-help-privacy-row code {
+.px-guide-privacy-row:last-child { border-bottom: none; }
+.px-guide-privacy-row:hover { background: rgba(74,222,128,0.06); }
+.px-guide-privacy-row svg { flex-shrink: 0; }
+.px-guide-privacy-row strong { color: var(--px-text-2); font-weight: 600; }
+.px-guide-privacy-row code {
   background: var(--px-surface-3);
   border: 1px solid var(--px-border);
   border-radius: 3px;
