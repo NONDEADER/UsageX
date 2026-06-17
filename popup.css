@@ -206,18 +206,26 @@ body {
 
 /* Rate pulse dot */
 .px-rate-dot {
+  position: relative;
   width: 7px;
   height: 7px;
-  border-radius: 50%;
-  background: #3f3f46;
   flex-shrink: 0;
-  transition: background 0.3s;
 }
-.px-rate-dot.rate-gray    { background: #3f3f46; }
-.px-rate-dot.rate-down    { background: #2dd4bf; animation: dot-pulse 2.5s ease-in-out infinite; }
-.px-rate-dot.rate-neutral { background: #64748b; animation: dot-pulse 3s ease-in-out infinite; }
-.px-rate-dot.rate-up      { background: var(--px-yellow); animation: dot-pulse 1.1s ease-in-out infinite; }
-.px-rate-dot.rate-extreme { background: #f97316; animation: dot-pulse 0.5s ease-in-out infinite; box-shadow: 0 0 5px rgba(249,115,22,0.6); }
+.px-rate-dot::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  transition: background-color 0.3s;
+}
+.px-rate-dot.rate-gray::before    { background: #3f3f46; }
+.px-rate-dot.rate-down::before    { background: #2dd4bf; animation: dot-pulse 2.5s ease-in-out infinite; }
+.px-rate-dot.rate-neutral::before { background: #64748b; animation: dot-pulse 3s ease-in-out infinite; }
+.px-rate-dot.rate-up::before      { background: var(--px-yellow); animation: dot-pulse 1.1s ease-in-out infinite; }
+.px-rate-dot.rate-extreme::before { background: #f97316; animation: dot-pulse 0.5s ease-in-out infinite; box-shadow: 0 0 5px rgba(249,115,22,0.6); }
 
 .px-track {
   height: 4px;
@@ -475,14 +483,26 @@ kbd {
   transform: translateX(-50%) translateY(0);
 }
 
-/* Align tooltip to appear above for rate dot */
+/* Align tooltip to appear above for rate dot, shifted left to prevent cutting out */
 .px-rate-dot[data-tooltip]::after {
   top: auto;
   bottom: calc(100% + 7px);
-  transform: translateX(-50%) translateY(3px);
+  left: auto;
+  right: -25px;
+  transform: translateY(3px);
 }
 .px-rate-dot[data-tooltip]:hover::after {
-  transform: translateX(-50%) translateY(0);
+  transform: translateY(0);
+}
+
+/* Align tooltip to appear below for Open Claude button, shifted left to prevent cutting out */
+#px-open-claude[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: translateY(-3px);
+}
+#px-open-claude[data-tooltip]:hover::after {
+  transform: translateY(0);
 }
 
 /* ─── Help Panel ─────────────────────────────────────────────── */

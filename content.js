@@ -1414,7 +1414,7 @@ function showToast(title, body, type = 'info') {
         <p class="ux-toast-title">${title}</p>
         <p class="ux-toast-sub">${body}</p>
       </div>
-      <button class="ux-toast-close" aria-label="Dismiss notification" title="Dismiss">
+      <button class="ux-toast-close" aria-label="Dismiss notification" data-tooltip="Dismiss">
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
       <div class="ux-toast-timer">
@@ -2175,10 +2175,10 @@ function getSidebarHTML() {
           <div class="ux-setting-row ux-setting-row-sub" id="ux-toast-position-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
             <span class="ux-setting-label">Toast Position</span>
             <div class="ux-toast-position-grid">
-              <button class="ux-toast-pos-btn" data-value="top-left" title="Top Left" type="button"></button>
-              <button class="ux-toast-pos-btn" data-value="top-right" title="Top Right" type="button"></button>
-              <button class="ux-toast-pos-btn" data-value="bottom-left" title="Bottom Left" type="button"></button>
-              <button class="ux-toast-pos-btn" data-value="bottom-right" title="Bottom Right" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="top-left" data-tooltip="Top Left" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="top-right" data-tooltip="Top Right" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="bottom-left" data-tooltip="Bottom Left" type="button"></button>
+              <button class="ux-toast-pos-btn" data-value="bottom-right" data-tooltip="Bottom Right" type="button"></button>
             </div>
           </div>
 
@@ -2514,10 +2514,12 @@ function getCSS() {
 }
 .ux-name { font-size: 13px; font-weight: 600; color: var(--ux-text-1); letter-spacing: 0.01em; }
 /* ── Claude-style tooltips ── */
-#usagex-v2-root [data-tooltip] {
+#usagex-v2-root [data-tooltip]:not(.ux-toast-close),
+#ux-toast-container [data-tooltip]:not(.ux-toast-close) {
   position: relative;
 }
-#usagex-v2-root [data-tooltip]::after {
+#usagex-v2-root [data-tooltip]::after,
+#ux-toast-container [data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
   top: calc(100% + 7px);
@@ -2547,7 +2549,8 @@ function getCSS() {
   letter-spacing: 0.01em !important;
   text-align: center;
 }
-#usagex-v2-root [data-tooltip]:hover::after {
+#usagex-v2-root [data-tooltip]:hover::after,
+#ux-toast-container [data-tooltip]:hover::after {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
@@ -2579,6 +2582,15 @@ function getCSS() {
 }
 #usagex-v2-root .ux-minimized-badge[data-tooltip]:hover::after {
   transform: translateX(-50%) translateY(0);
+}
+/* Align toast close button tooltip to the right so it doesn't overflow screen edge */
+#ux-toast-container .ux-toast-close[data-tooltip]::after {
+  left: auto;
+  right: 0;
+  transform: translateY(-3px);
+}
+#ux-toast-container .ux-toast-close[data-tooltip]:hover::after {
+  transform: translateY(0);
 }
 .ux-icon-row { display: flex; gap: 2px; }
 .ux-icn {
