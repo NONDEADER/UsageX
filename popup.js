@@ -141,21 +141,20 @@ function initTabs() {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 async function refreshDashboard() {
-  const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs']);
+  const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs', 'history', 'settings']);
   const today  = res.today         || freshToday();
   const limits = res.usage_limits  || {};
+  const history = res.history      || [];
+  const settings = res.settings   || {};
 
   // ── Status banner + live dot ──
-  const { inPeak } = getPeakStatus();
-  
+  const { inPeak, isWeekend } = getPeakStatus();
+
   let onClaude = false;
   try {
     const tabs = await browser.tabs.query({ active: true, currentWindow: true });
     if (tabs && tabs[0] && tabs[0].url) {
-      const url = tabs[0].url;
-      if (url.includes('claude.ai')) {
-        onClaude = true;
-      }
+      if (tabs[0].url.includes('claude.ai')) onClaude = true;
     }
   } catch (_) {}
 
@@ -174,6 +173,26 @@ async function refreshDashboard() {
   const liveDot = el('px-live-dot');
   if (liveDot) {
     liveDot.className = 'px-live-dot ' + (inPeak ? 'dot-peak' : 'dot-off');
+  }
+
+  // ── Feature 7: Peak hours hint ──
+  const peakHint = el('px-peak-hint');
+  if (peakHint) {
+    if (isWeekend) {
+      peakHint.style.display = 'none';
+    } else if (inPeak) {
+      peakHint.style.display = '';
+      peakHint.className = 'px-peak-hint px-peak-warn';
+      peakHint.innerHTML =
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>' +
+        '<span>Peak hours active — limits deplete faster until 12:30 AM IST</span>';
+    } else {
+      peakHint.style.display = '';
+      peakHint.className = 'px-peak-hint px-peak-ok';
+      peakHint.innerHTML =
+        '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' +
+        '<span>Off-peak — great time for heavy prompts</span>';
+    }
   }
 
   // ── Usage bars ──
@@ -241,6 +260,388 @@ async function refreshDashboard() {
   const debugLogs = res.debug_logs || [];
   const badge = el('px-debug-badge');
   if (badge) badge.textContent = debugLogs.length;
+
+  // ── Feature 9: Pinned mini-stats strip ──
+  const qsSession = el('px-qs-session');
+  const qsWeekly  = el('px-qs-weekly');
+  const qsMsgs    = el('px-qs-msgs');
+  if (qsSession) {
+    qsSession.textContent = fmtPct(sessionPct);
+    qsSession.style.color  = getThresholdColor(sessionPct) || 'var(--px-text-2)';
+  }
+  if (qsWeekly) {
+    qsWeekly.textContent = fmtPct(weeklyPct);
+    qsWeekly.style.color  = getThresholdColor(weeklyPct) || 'var(--px-text-2)';
+  }
+  if (qsMsgs) {
+    qsMsgs.textContent = today.msgs != null ? String(today.msgs) : '0';
+  }
+
+  // ── Features 5 & 6: Today section — effort breakdown + daily meta ──
+  const eb      = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
+  const ebTotal = (eb.low || 0) + (eb.medium || 0) + (eb.high || 0) + (eb.max || 0);
+  const maxCount = Math.max(eb.low || 0, eb.medium || 0, eb.high || 0, eb.max || 0, 1);
+
+  const effortPairs = [
+    ['low',    'px-ef-low',  'px-ec-low'],
+    ['medium', 'px-ef-med',  'px-ec-med'],
+    ['high',   'px-ef-high', 'px-ec-high'],
+    ['max',    'px-ef-max',  'px-ec-max'],
+  ];
+  for (const [key, fillId, countId] of effortPairs) {
+    const cnt  = eb[key] || 0;
+    const fill = el(fillId);
+    const count = el(countId);
+    if (fill)  fill.style.width = Math.round((cnt / maxCount) * 100) + '%';
+    if (count) count.textContent = String(cnt);
+  }
+
+  // Feature 6: avg tokens/msg
+  const msgs      = today.msgs || 0;
+  const tokensEst = today.tokens_est || 0;
+  const avgTok    = msgs > 0 ? Math.round(tokensEst / msgs) : null;
+  const timeStr   = formatDuration(today.time_s);
+
+  const metaEl = el('px-today-meta');
+  if (metaEl) {
+    const parts = [
+      `${msgs} msg${msgs !== 1 ? 's' : ''}`,
+      `${timeStr} active`,
+      `~${formatTokens(tokensEst)} tokens`,
+    ];
+    if (avgTok !== null) parts.push(`~${formatTokens(avgTok)}/msg avg`);
+    metaEl.textContent = parts.join(' · ');
+  }
+
+  // Hide Today section only when there are zero messages AND no limits data yet
+  const todaySec = el('px-today-section');
+  if (todaySec) {
+    todaySec.style.display = (msgs === 0 && ebTotal === 0) ? 'none' : '';
+  }
+
+  // ── Feature 1: Sparkline ──
+  renderSparkline(history, today);
+
+  // ── Feature 10: sync threshold sliders from settings ──
+  const sessSlider = el('px-thresh-session');
+  const weekSlider = el('px-thresh-weekly');
+  const sessVal    = el('px-thresh-session-val');
+  const weekVal    = el('px-thresh-weekly-val');
+  if (sessSlider && settings.alert_session_threshold != null) {
+    sessSlider.value = settings.alert_session_threshold;
+    if (sessVal) sessVal.textContent = settings.alert_session_threshold + '%';
+  }
+  if (weekSlider && settings.alert_weekly_threshold != null) {
+    weekSlider.value = settings.alert_weekly_threshold;
+    if (weekVal) weekVal.textContent = settings.alert_weekly_threshold + '%';
+  }
+}
+
+// ─── Sparkline (Feature 1) ───────────────────────────────────────────────────
+
+function renderSparkline(history, today) {
+  const chartEl  = el('px-chart');
+  const labelsEl = el('px-chart-labels');
+  const section  = el('px-chart-section');
+  if (!chartEl) return;
+
+  // Build last 7 data points: history days + today
+  const allDays = [...history.slice(-6), today].filter(Boolean);
+  if (allDays.length < 2) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = '';
+
+  const vals = allDays.map(d => d.tokens_est || 0);
+  const maxV = Math.max(...vals, 1);
+  const W = 220, H = 60, padX = 8, padY = 8;
+  const n = vals.length;
+
+  const pts = vals.map((v, i) => {
+    const x = padX + (i / (n - 1)) * (W - padX * 2);
+    const y = H - padY - ((v / maxV) * (H - padY * 2));
+    return [x, y];
+  });
+
+  const maxY = padY;
+  const minY = H - padY;
+
+  // Calculate 7-day average for scale line
+  const totalTokens = vals.reduce((a, b) => a + b, 0);
+  const avgTokens = Math.round(totalTokens / n);
+  const avgY = H - padY - ((avgTokens / maxV) * (H - padY * 2));
+
+  // Build smooth cubic bezier path
+  let d = `M ${pts[0][0]},${pts[0][1]}`;
+  for (let i = 1; i < pts.length; i++) {
+    const [x0, y0] = pts[i - 1];
+    const [x1, y1] = pts[i];
+    const cx = (x0 + x1) / 2;
+    d += ` C ${cx},${y0} ${cx},${y1} ${x1},${y1}`;
+  }
+
+  // Area fill path
+  const areaD = d + ` L ${pts[pts.length-1][0]},${H} L ${pts[0][0]},${H} Z`;
+
+  chartEl.innerHTML = `
+    <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true" style="overflow: visible;">
+      <defs>
+        <linearGradient id="px-spark-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%"   stop-color="#cc9966" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="#cc9966" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      
+      <!-- Grid boundaries -->
+      <line x1="${padX}" y1="${maxY}" x2="${W - padX}" y2="${maxY}" stroke="rgba(255, 255, 255, 0.05)" stroke-width="0.8" />
+      <line x1="${padX}" y1="${minY}" x2="${W - padX}" y2="${minY}" stroke="rgba(255, 255, 255, 0.05)" stroke-width="0.8" />
+      
+      <!-- Scale labels -->
+      <text x="${padX}" y="${maxY + 7}" fill="var(--px-text-3)" font-size="7" font-weight="600" opacity="0.6">Max: ~${formatTokens(maxV)}</text>
+      <text x="${padX}" y="${minY - 2}" fill="var(--px-text-3)" font-size="7" font-weight="600" opacity="0.6">0</text>
+      
+      <!-- Average reference line -->
+      <line x1="${padX}" y1="${avgY}" x2="${W - padX}" y2="${avgY}" stroke="rgba(204, 153, 102, 0.2)" stroke-width="0.8" stroke-dasharray="3,3" />
+      <text x="${W - padX - 4}" y="${avgY - 3}" fill="rgba(204, 153, 102, 0.5)" font-size="7" font-weight="600" text-anchor="end">Avg: ~${formatTokens(avgTokens)}</text>
+      
+      <!-- Hover guide line -->
+      <line class="px-spark-hover-line" x1="-10" y1="${maxY}" x2="-10" y2="${minY}" stroke="rgba(204, 153, 102, 0.4)" stroke-width="1" stroke-dasharray="2,2" style="display: none;" />
+      
+      <!-- Chart area and path -->
+      <path d="${areaD}" fill="url(#px-spark-grad)"/>
+      <path d="${d}" fill="none" stroke="#cc9966" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      
+      <!-- Spark points -->
+      ${pts.map(([x, y], i) => `
+        <circle class="px-spark-point" cx="${x}" cy="${y}" r="3" fill="#cc9966" data-index="${i}">
+          <title>${allDays[i].date || ''}: ~${formatTokens(vals[i])} tokens</title>
+        </circle>
+      `).join('')}
+    </svg>`;
+
+  // Day labels: Mon/Tue/…
+  if (labelsEl) {
+    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    labelsEl.innerHTML = allDays.map(d => {
+      if (!d.date) return '<span></span>';
+      const day = new Date(d.date + 'T12:00:00').getDay();
+      return `<span>${days[day]}</span>`;
+    }).join('');
+  }
+
+  // Interactive hover label
+  const hoverValEl = el('px-chart-hover-val');
+  if (hoverValEl) {
+    hoverValEl.textContent = `Avg: ~${formatTokens(avgTokens)}`;
+  }
+
+  const svgEl = chartEl.querySelector('svg');
+  if (svgEl && hoverValEl) {
+    const circles = svgEl.querySelectorAll('circle.px-spark-point');
+    const hoverLine = svgEl.querySelector('.px-spark-hover-line');
+
+    const handleHover = (clientX) => {
+      const rect = svgEl.getBoundingClientRect();
+      const mouseX = ((clientX - rect.left) / rect.width) * W;
+
+      // Find closest point by X coordinate
+      let minDiff = Infinity;
+      let closestIdx = 0;
+      pts.forEach(([px, py], i) => {
+        const diff = Math.abs(px - mouseX);
+        if (diff < minDiff) {
+          minDiff = diff;
+          closestIdx = i;
+        }
+      });
+
+      // Update vertical hover line position
+      if (hoverLine) {
+        hoverLine.setAttribute('x1', pts[closestIdx][0]);
+        hoverLine.setAttribute('x2', pts[closestIdx][0]);
+        hoverLine.style.display = 'block';
+      }
+
+      // Update circle radii and styles
+      circles.forEach((circle, idx) => {
+        if (idx === closestIdx) {
+          circle.setAttribute('r', '4.5');
+          circle.setAttribute('fill', '#e6b87a');
+        } else {
+          circle.setAttribute('r', '2.5');
+          circle.setAttribute('fill', '#cc9966');
+        }
+      });
+
+      // Update interactive label
+      const d = allDays[closestIdx];
+      const dateStr = d.date ? new Date(d.date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today';
+      hoverValEl.innerHTML = `<span class="px-chart-hover-date">${dateStr}:</span> <strong class="px-chart-hover-count">~${formatTokens(vals[closestIdx])}</strong>`;
+    };
+
+    const resetHover = () => {
+      if (hoverLine) {
+        hoverLine.style.display = 'none';
+      }
+      circles.forEach(circle => {
+        circle.setAttribute('r', '3');
+        circle.setAttribute('fill', '#cc9966');
+      });
+      hoverValEl.textContent = `Avg: ~${formatTokens(avgTokens)}`;
+    };
+
+    svgEl.addEventListener('mousemove', (e) => {
+      handleHover(e.clientX);
+    });
+
+    svgEl.addEventListener('mouseleave', () => {
+      resetHover();
+    });
+
+    // Touch events for mobile compatibility
+    svgEl.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) {
+        handleHover(e.touches[0].clientX);
+      }
+    }, { passive: true });
+
+    svgEl.addEventListener('touchend', () => {
+      resetHover();
+    });
+  }
+}
+
+// ─── History Panel (Features 12 & 14) ────────────────────────────────────────
+
+async function initHistory() {
+  const res = await browser.storage.local.get(['history', 'today', 'conv_stats']);
+  const history   = res.history    || [];
+  const today     = res.today      || freshToday();
+  const convStats = res.conv_stats || {};
+
+  const allDays = [...history, today].filter(Boolean);
+
+  // Compute total tokens for the header
+  const totalTok = allDays.reduce((sum, d) => sum + (d.tokens_est || 0), 0);
+  const totalEl = el('px-heatmap-total-est');
+  if (totalEl) {
+    if (totalTok > 0) {
+      totalEl.innerHTML = `<strong>~${formatTokens(totalTok)}</strong> tokens`;
+    } else {
+      totalEl.textContent = '';
+    }
+  }
+
+  renderHeatmap(allDays);
+  renderTopConversations(convStats);
+  renderDailyLog([...history].reverse());
+}
+
+function renderHeatmap(days) {
+  const el_ = el('px-heatmap');
+  if (!el_) return;
+
+  // Build a lookup: date string → tokens_est
+  const lookup = {};
+  days.forEach(d => { if (d.date) lookup[d.date] = d.tokens_est || 0; });
+
+  const maxTok = Math.max(...Object.values(lookup), 1);
+
+  // Determine the grid start: go back 20 weeks (140 days), then rewind to
+  // the start of that week (Sunday = 0).
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+
+  // Start from 20 weeks ago, aligned to a Sunday
+  const startDate = new Date(today);
+  startDate.setDate(today.getDate() - 139);
+  // Rewind to Sunday of that week
+  const dayOfWeek = startDate.getDay(); // 0 = Sun
+  startDate.setDate(startDate.getDate() - dayOfWeek);
+
+  const cells = [];
+  const cursor = new Date(startDate);
+
+  while (cursor <= today) {
+    const dateStr = cursor.toISOString().slice(0, 10);
+    const isFuture = cursor > today;
+    const tok = lookup[dateStr] || 0;
+    const ratio = tok / maxTok;
+
+    let level = 0;
+    if (!isFuture && tok > 0) {
+      if (ratio > 0.75)      level = 4;
+      else if (ratio > 0.5)  level = 3;
+      else if (ratio > 0.25) level = 2;
+      else                   level = 1;
+    }
+
+    let label = '';
+    if (!isFuture) {
+      const dateLabel = cursor.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+      label = tok > 0
+        ? `${dateLabel}: ~${formatTokens(tok)} tokens`
+        : `${dateLabel}: no usage`;
+    }
+
+    const futureClass = isFuture ? ' px-hm-future' : '';
+    const tooltipAttr = label ? ` data-tooltip="${label}"` : '';
+    cells.push(`<span class="px-hm-cell px-hm-${level}${futureClass}"${tooltipAttr}></span>`);
+
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  el_.innerHTML = cells.join('');
+}
+
+function renderTopConversations(convStats) {
+  const listEl = el('px-convo-list');
+  const section = el('px-convos-section');
+  if (!listEl) return;
+
+  const entries = Object.entries(convStats)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => (b.tokens_est || 0) - (a.tokens_est || 0))
+    .slice(0, 5);
+
+  if (entries.length === 0) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = '';
+
+  const topTokens = entries[0].tokens_est || 1;
+  listEl.innerHTML = entries.map((c, i) => {
+    const name = c.name || `Conversation ${i + 1}`;
+    const barW = Math.round(((c.tokens_est || 0) / topTokens) * 100);
+    const ts   = c.last_active ? new Date(c.last_active).toLocaleDateString() : '';
+    return `
+      <div class="px-convo-row">
+        <div class="px-convo-header">
+          <span class="px-convo-name" title="${name}">${name}</span>
+          <span class="px-convo-date">${ts}</span>
+        </div>
+        <div class="px-convo-bar-wrap">
+          <div class="px-convo-bar" style="width:${barW}%"></div>
+        </div>
+        <div class="px-convo-meta">${c.msgs || 0} msgs · ~${formatTokens(c.tokens_est || 0)} tokens</div>
+      </div>`;
+  }).join('');
+}
+
+function renderDailyLog(historyDesc) {
+  const listEl = el('px-history-list');
+  if (!listEl) return;
+  if (!historyDesc.length) {
+    listEl.innerHTML = '<div class="px-history-empty">No history yet. Use Claude to build history.</div>';
+    return;
+  }
+  listEl.innerHTML = historyDesc.map(d => `
+    <div class="px-history-row">
+      <span class="px-history-date">${d.date || '—'}</span>
+      <span class="px-history-stats">${d.msgs || 0} msgs · ~${formatTokens(d.tokens_est || 0)} tok · ${formatDuration(d.time_s)}</span>
+    </div>`).join('');
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
@@ -297,6 +698,30 @@ function initTools() {
       await clearDebugLogs();
     }
   });
+
+  // ── Feature 10: Alert Threshold Sliders ──
+  const sessSlider = el('px-thresh-session');
+  const weekSlider = el('px-thresh-weekly');
+
+  async function saveThresholds() {
+    const res = await browser.storage.local.get('settings');
+    const s   = res.settings || {};
+    const sessV = Number(sessSlider?.value ?? 80);
+    const weekV = Number(weekSlider?.value ?? 80);
+    await browser.storage.local.set({ settings: { ...s, alert_session_threshold: sessV, alert_weekly_threshold: weekV } });
+  }
+
+  sessSlider?.addEventListener('input', () => {
+    const v = el('px-thresh-session-val');
+    if (v) v.textContent = sessSlider.value + '%';
+  });
+  sessSlider?.addEventListener('change', saveThresholds);
+
+  weekSlider?.addEventListener('input', () => {
+    const v = el('px-thresh-weekly-val');
+    if (v) v.textContent = weekSlider.value + '%';
+  });
+  weekSlider?.addEventListener('change', saveThresholds);
 }
 
 // ─── Open Claude button ──────────────────────────────────────────────────────
@@ -329,6 +754,14 @@ async function init() {
   initTools();
   initOpenClaude();
   await refreshDashboard();
+
+  // Lazy-load History tab on first click
+  const histTab = el('tab-history');
+  if (histTab) {
+    histTab.addEventListener('click', () => {
+      initHistory().catch(() => {});
+    }, { once: true });
+  }
 
   // Auto-switch to a specific tab if requested via URL param or storage flag
   const urlParam = new URLSearchParams(location.search).get('tab');

@@ -30,6 +30,24 @@
     </a>
   </div>
 
+  <!-- Mini-stats strip (Feature 9) -->
+  <div class="px-quick-stats" id="px-quick-stats" aria-label="Quick stats">
+    <span class="px-qs-item">
+      <span class="px-qs-label">Session</span>
+      <span class="px-qs-val" id="px-qs-session">—</span>
+    </span>
+    <span class="px-qs-sep">·</span>
+    <span class="px-qs-item">
+      <span class="px-qs-label">Weekly</span>
+      <span class="px-qs-val" id="px-qs-weekly">—</span>
+    </span>
+    <span class="px-qs-sep">·</span>
+    <span class="px-qs-item">
+      <span class="px-qs-val" id="px-qs-msgs">—</span>
+      <span class="px-qs-label">msgs today</span>
+    </span>
+  </div>
+
   <!-- Tab Nav -->
   <div class="px-tabs" role="tablist">
     <button class="px-tab px-tab-active" id="tab-dashboard" role="tab" aria-selected="true" aria-controls="panel-dashboard">
@@ -44,6 +62,12 @@
         <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
       </svg>
       Tools
+    </button>
+    <button class="px-tab" id="tab-history" role="tab" aria-selected="false" aria-controls="panel-history">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      History
     </button>
     <button class="px-tab" id="tab-help" role="tab" aria-selected="false" aria-controls="panel-help">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -65,6 +89,9 @@
       </svg>
       <span id="px-status-text">Open claude.ai to track usage</span>
     </div>
+
+    <!-- Peak hours hint (Feature 7) -->
+    <div class="px-peak-hint" id="px-peak-hint" style="display:none"></div>
 
     <!-- Usage bars section -->
     <div class="px-section">
@@ -95,6 +122,58 @@
         <div class="px-reset-time" id="px-weekly-time"></div>
       </div>
     </div>
+
+    <!-- Today section: Effort breakdown + daily meta (Features 5 & 6) -->
+    <div class="px-section" id="px-today-section">
+      <div class="px-section-title">Today</div>
+
+      <!-- Effort breakdown bars -->
+      <div class="px-effort-list" id="px-effort-list">
+        <div class="px-effort-row">
+          <span class="px-effort-label px-effort-low">Low</span>
+          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-low" id="px-ef-low" style="width:0%"></div></div>
+          <span class="px-effort-count" id="px-ec-low">0</span>
+        </div>
+        <div class="px-effort-row">
+          <span class="px-effort-label px-effort-medium">Med</span>
+          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-medium" id="px-ef-med" style="width:0%"></div></div>
+          <span class="px-effort-count" id="px-ec-med">0</span>
+        </div>
+        <div class="px-effort-row">
+          <span class="px-effort-label px-effort-high">High</span>
+          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-high" id="px-ef-high" style="width:0%"></div></div>
+          <span class="px-effort-count" id="px-ec-high">0</span>
+        </div>
+        <div class="px-effort-row">
+          <span class="px-effort-label px-effort-max">Max</span>
+          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-max" id="px-ef-max" style="width:0%"></div></div>
+          <span class="px-effort-count" id="px-ec-max">0</span>
+        </div>
+      </div>
+
+      <!-- Daily meta row (Feature 6) -->
+      <div class="px-today-meta" id="px-today-meta"></div>
+    </div>
+
+    <!-- Usage Trend Sparkline (Feature 1) -->
+    <div class="px-section" id="px-chart-section">
+      <div class="px-section-title">
+        <span class="px-title-with-info">
+          7-Day Token Trend
+          <span class="px-info-icon" data-tooltip="Estimated daily token usage (prompts + responses) over the last 7 days.">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="16" x2="12" y2="12"/>
+              <line x1="12" y1="8" x2="12.01" y2="8"/>
+            </svg>
+          </span>
+        </span>
+        <span class="px-chart-hover-val" id="px-chart-hover-val"></span>
+      </div>
+      <div class="px-chart-wrap" id="px-chart"></div>
+      <div class="px-chart-labels" id="px-chart-labels"></div>
+    </div>
+
   </div>
 
   <!-- ── PANEL: Tools ── -->
@@ -140,6 +219,27 @@
       </div>
     </div>
 
+    <!-- Alert Thresholds (Feature 10) -->
+    <div class="px-section">
+      <div class="px-section-title">Alert Thresholds</div>
+      <div class="px-info-rows">
+        <div class="px-threshold-row">
+          <div class="px-threshold-top">
+            <span class="px-threshold-label">Session warning</span>
+            <span class="px-threshold-val" id="px-thresh-session-val">80%</span>
+          </div>
+          <input class="px-threshold-slider" id="px-thresh-session" type="range" min="50" max="95" step="5" value="80" aria-label="Session warning threshold">
+        </div>
+        <div class="px-threshold-row">
+          <div class="px-threshold-top">
+            <span class="px-threshold-label">Weekly warning</span>
+            <span class="px-threshold-val" id="px-thresh-weekly-val">80%</span>
+          </div>
+          <input class="px-threshold-slider" id="px-thresh-weekly" type="range" min="50" max="95" step="5" value="80" aria-label="Weekly warning threshold">
+        </div>
+      </div>
+    </div>
+
     <!-- Keyboard Shortcuts -->
     <div class="px-section">
       <div class="px-section-title">Keyboard Shortcuts</div>
@@ -171,6 +271,54 @@
     </div>
 
     <div class="px-action-feedback" id="px-action-feedback"></div>
+
+  </div>
+
+  <!-- ── PANEL: History ── -->
+  <div class="px-panel" id="panel-history" role="tabpanel" aria-labelledby="tab-history">
+
+    <!-- Usage Heatmap (Feature 12) -->
+    <div class="px-section">
+      <div class="px-heatmap-header">
+        <div class="px-heatmap-header-left">
+          <span class="px-heatmap-filter-pill">last 30 days</span>
+          <span class="px-heatmap-total-est" id="px-heatmap-total-est">—</span>
+        </div>
+        <div class="px-heatmap-legend">
+          <span class="px-hm-legend-label">less</span>
+          <span class="px-hm-cell px-hm-0"></span>
+          <span class="px-hm-cell px-hm-1"></span>
+          <span class="px-hm-cell px-hm-2"></span>
+          <span class="px-hm-cell px-hm-3"></span>
+          <span class="px-hm-cell px-hm-4"></span>
+          <span class="px-hm-legend-label">more</span>
+        </div>
+      </div>
+      <div class="px-heatmap-container">
+        <div class="px-heatmap-y-labels">
+          <span></span>
+          <span>mon</span>
+          <span></span>
+          <span>wed</span>
+          <span></span>
+          <span>fri</span>
+          <span></span>
+        </div>
+        <div class="px-heatmap" id="px-heatmap"></div>
+      </div>
+    </div>
+
+    <!-- Top Conversations (Feature 14) -->
+    <div class="px-section" id="px-convos-section">
+      <div class="px-section-title">Top Conversations</div>
+      <div class="px-convo-list" id="px-convo-list"></div>
+    </div>
+
+    <!-- Daily History Log -->
+    <div class="px-section">
+      <div class="px-section-title">Daily Log</div>
+      <div class="px-history-list" id="px-history-list"></div>
+    </div>
 
   </div>
 

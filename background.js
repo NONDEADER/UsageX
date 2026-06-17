@@ -34,7 +34,9 @@ function defaultSettings() {
     alert_limits_reset: true,
     alert_usage_threshold: true,
     alert_peak_hours: true,
-    toast_position: 'bottom-right'
+    toast_position: 'bottom-right',
+    alert_session_threshold: 80,
+    alert_weekly_threshold: 80
   };
 }
 

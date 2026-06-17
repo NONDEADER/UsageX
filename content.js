@@ -54,6 +54,7 @@ let resetIdleHandler = null;
 let windowMsgHandler = null;
 let sidebarResizeObserver = null;
 let keyboardShortcutHandler = null;
+let storageOnChangedHandler = null;
 
 window.__usagex_cleanup = () => {
   if (tryInjectInterval) clearInterval(tryInjectInterval);
@@ -83,6 +84,7 @@ window.__usagex_cleanup = () => {
   if (dragMoveHandler) document.removeEventListener('mousemove', dragMoveHandler);
   if (dragUpHandler) document.removeEventListener('mouseup', dragUpHandler);
   if (windowMsgHandler) window.removeEventListener('message', windowMsgHandler);
+  if (storageOnChangedHandler) browser.storage.onChanged.removeListener(storageOnChangedHandler);
 
   // Remove existing elements
   const existingWidget = document.getElementById(UX_ID);
@@ -178,7 +180,9 @@ function defaultSettings() {
     alert_limits_reset: true,
     alert_usage_threshold: true,
     alert_peak_hours: true,
-    toast_position: 'bottom-right'
+    toast_position: 'bottom-right',
+    alert_session_threshold: 80,
+    alert_weekly_threshold: 80
   };
 }
 function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -332,7 +336,7 @@ function injectFetchHook() {
 windowMsgHandler = (event) => {
   if (event.source !== window) return;
   if (event.data.type === '__ux_fetch_msg') {
-    onMessageSent({ body: event.data.body }).catch(() => { });
+    onMessageSent({ body: event.data.body, convoId: event.data.convoId || null }).catch(() => { });
   } else if (event.data.type === '__ux_usage_data') {
     (async () => {
       const d = event.data.data;
@@ -341,10 +345,26 @@ windowMsgHandler = (event) => {
       await updateUI();
     })().catch(() => { });
   } else if (event.data.type === '__ux_convo_history') {
-    onConversationHistory(event.data.data).catch(() => { });
+    onConversationHistory(event.data.data, event.data.convoId || null, event.data.convoName || null).catch(() => { });
   }
 };
 window.addEventListener('message', windowMsgHandler);
+
+storageOnChangedHandler = (changes, area) => {
+  if (area !== 'local') return;
+  if (changes.settings) {
+    const oldVal = changes.settings.oldValue || {};
+    const newVal = changes.settings.newValue || {};
+    if (oldVal.alert_session_threshold !== newVal.alert_session_threshold) {
+      alertedFlags.session80 = false;
+    }
+    if (oldVal.alert_weekly_threshold !== newVal.alert_weekly_threshold) {
+      alertedFlags.weekly80 = false;
+    }
+    updateUI().catch(() => {});
+  }
+};
+browser.storage.onChanged.addListener(storageOnChangedHandler);
 
 // ─── Message tracking ──────────────────────────────────────────────────────────
 
@@ -401,6 +421,28 @@ async function onMessageSent(req) {
     effort_breakdown: eb,
     recent_sent_prompts: recent
   });
+
+  // Feature 14: track per-conversation stats
+  const convoId = req.convoId || (location.pathname.startsWith('/chat/') ? location.pathname.split('/')[2] : null);
+  if (convoId) {
+    const convRes = await browser.storage.local.get('conv_stats');
+    const convStats = convRes.conv_stats || {};
+    const existing = convStats[convoId] || { msgs: 0, tokens_est: 0, started_at: Date.now(), name: null };
+    convStats[convoId] = {
+      ...existing,
+      msgs: existing.msgs + 1,
+      tokens_est: existing.tokens_est + tokenDelta,
+      last_active: Date.now()
+    };
+    // Cap at 200 entries: evict oldest by last_active
+    const ids = Object.keys(convStats);
+    if (ids.length > 200) {
+      ids.sort((a, b) => (convStats[a].last_active || 0) - (convStats[b].last_active || 0));
+      delete convStats[ids[0]];
+    }
+    await browser.storage.local.set({ conv_stats: convStats });
+  }
+
   updateUI().catch(() => { });
   debugLog('msg_sent', { effort, isThinking, inputTokens, thinkTokens });
   setTimeout(() => {
@@ -408,7 +450,7 @@ async function onMessageSent(req) {
   }, 2000);
 }
 
-async function onConversationHistory(chatMessages) {
+async function onConversationHistory(chatMessages, convoId, convoName) {
   if (!Array.isArray(chatMessages)) return;
 
   const res = await browser.storage.local.get('today');
@@ -508,6 +550,22 @@ async function onConversationHistory(chatMessages) {
       processed_msg_uuids: today.processed_msg_uuids,
       recent_sent_prompts: today.recent_sent_prompts
     });
+
+    // Feature 14: update conv_stats from history sync
+    if (convoId && newMsgs > 0) {
+      const convRes = await browser.storage.local.get('conv_stats');
+      const convStats = convRes.conv_stats || {};
+      const existing = convStats[convoId] || { msgs: 0, tokens_est: 0, started_at: Date.now(), name: null };
+      convStats[convoId] = {
+        ...existing,
+        msgs: existing.msgs + newMsgs,
+        tokens_est: existing.tokens_est + newTokenDelta,
+        last_active: Date.now(),
+        name: convoName || existing.name || null
+      };
+      await browser.storage.local.set({ conv_stats: convStats });
+    }
+
     updateUI().catch(() => { });
     debugLog('history_synced', { newMsgs, newTokenDelta });
   }
@@ -1468,23 +1526,25 @@ function checkToastAlerts(sessionPct, weeklyPct, usageRateState, settings) {
       alertedFlags.limitReached = false;
     }
 
-    // 80% Session usage warning
-    if (sessionPct != null && sessionPct >= 80 && sessionPct < 100) {
+    // Dynamic Session usage warning (Feature 10)
+    const sessionThresh = Number(settings.alert_session_threshold ?? 80);
+    if (sessionPct != null && sessionPct >= sessionThresh && sessionPct < 100) {
       if (!alertedFlags.session80) {
         showToast("High Session Usage", `Session usage is at ${Math.round(sessionPct)}%. Consider lowering your effort level.`, "yellow");
         alertedFlags.session80 = true;
       }
-    } else if (sessionPct != null && sessionPct < 80) {
+    } else if (sessionPct != null && sessionPct < sessionThresh) {
       alertedFlags.session80 = false;
     }
 
-    // 80% Weekly usage warning
-    if (weeklyPct != null && weeklyPct >= 80 && weeklyPct < 100) {
+    // Dynamic Weekly usage warning (Feature 10)
+    const weeklyThresh = Number(settings.alert_weekly_threshold ?? 80);
+    if (weeklyPct != null && weeklyPct >= weeklyThresh && weeklyPct < 100) {
       if (!alertedFlags.weekly80) {
         showToast("High Weekly Usage", `Weekly usage is at ${Math.round(weeklyPct)}%. You are close to your weekly limit.`, "yellow");
         alertedFlags.weekly80 = true;
       }
-    } else if (weeklyPct != null && weeklyPct < 80) {
+    } else if (weeklyPct != null && weeklyPct < weeklyThresh) {
       alertedFlags.weekly80 = false;
     }
   }

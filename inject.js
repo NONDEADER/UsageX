@@ -35,9 +35,13 @@
               reqBody = await clone.text();
             }
           } catch (_) {}
+
+          // Extract convoId from URL for per-conversation tracking (Feature 14)
+          const convoIdMatch = url.match(/\/chat_conversations\/([a-f0-9-]{36})/i);
+          const convoId = convoIdMatch ? convoIdMatch[1] : null;
           
           if (reqBody) {
-            window.postMessage({ type: '__ux_fetch_msg', body: reqBody }, '*');
+            window.postMessage({ type: '__ux_fetch_msg', body: reqBody, convoId }, '*');
           }
         })().catch(() => {});
       }
@@ -53,7 +57,11 @@
             
             // Intercept conversation history (GET /chat_conversations/{uuid})
             if (url.includes('/chat_conversations/') && Array.isArray(json.chat_messages)) {
-              window.postMessage({ type: '__ux_convo_history', data: json.chat_messages }, '*');
+              // Extract convoId and optional name from URL + response
+              const convoIdMatch = url.match(/\/chat_conversations\/([a-f0-9-]{36})/i);
+              const convoId = convoIdMatch ? convoIdMatch[1] : null;
+              const convoName = typeof json.name === 'string' ? json.name : null;
+              window.postMessage({ type: '__ux_convo_history', data: json.chat_messages, convoId, convoName }, '*');
             }
 
             if (json.five_hour || json.seven_day) {

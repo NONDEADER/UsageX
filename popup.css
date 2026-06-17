@@ -26,13 +26,16 @@
 }
 
 body {
-  width: 340px;
+  width: 350px;
+  height: 580px;
   background: var(--px-bg);
   color: var(--px-text-1);
   font-family: var(--px-font);
   font-size: 13px;
   line-height: 1.5;
-  overflow-x: hidden;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ─── Header ────────────────────────────────────────────────── */
@@ -136,7 +139,15 @@ body {
 }
 
 /* ─── Panels ────────────────────────────────────────────────── */
-.px-panel { display: none; padding: 12px 14px 14px; }
+.px-panel {
+  display: none;
+  padding: 12px 14px 14px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+  scrollbar-width: thin;
+  scrollbar-color: #333 transparent;
+}
 .px-panel.px-panel-active { display: block; }
 
 /* ─── Section ───────────────────────────────────────────────── */
@@ -144,6 +155,9 @@ body {
 .px-section:last-child { margin-bottom: 0; }
 
 .px-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
@@ -152,6 +166,70 @@ body {
   margin-bottom: 8px;
   padding-bottom: 5px;
   border-bottom: 1px solid var(--px-border-subtle);
+}
+
+/* ─── Quick Stats Strip (Feature 9) ────────────────────────── */
+.px-quick-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 5px 14px;
+  background: var(--px-surface);
+  border-bottom: 1px solid var(--px-border);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.px-qs-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.px-qs-label {
+  color: var(--px-text-4);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.px-qs-val {
+  font-weight: 700;
+  color: var(--px-text-2);
+  letter-spacing: -0.01em;
+}
+.px-qs-sep {
+  color: var(--px-text-4);
+  font-size: 10px;
+  user-select: none;
+}
+
+/* ─── Peak Hours Hint (Feature 7) ───────────────────────────── */
+.px-peak-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border-radius: var(--px-radius-sm);
+  font-size: 11.5px;
+  font-weight: 500;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+.px-peak-hint.px-peak-warn {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.22);
+  color: #f8c055;
+}
+.px-peak-hint.px-peak-warn svg {
+  color: #f59e0b;
+  flex-shrink: 0;
+}
+.px-peak-hint.px-peak-ok {
+  background: rgba(74, 222, 128, 0.06);
+  border: 1px solid rgba(74, 222, 128, 0.18);
+  color: var(--px-green);
+}
+.px-peak-hint.px-peak-ok svg {
+  color: var(--px-green);
+  flex-shrink: 0;
 }
 
 /* ─── Status Banner ─────────────────────────────────────────── */
@@ -317,6 +395,19 @@ body {
   min-width: 18px;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* ─── Today Meta Row (Feature 6) ───────────────────────────── */
+.px-today-meta {
+  margin-top: 8px;
+  padding: 5px 8px;
+  background: var(--px-surface-3);
+  border-radius: var(--px-radius-sm);
+  font-size: 10.5px;
+  color: var(--px-text-3);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
 }
 
 /* ─── Tools ─────────────────────────────────────────────────── */
@@ -783,4 +874,340 @@ kbd {
   padding: 1px 5px;
   color: var(--px-text-2);
   font-family: 'Courier New', Courier, monospace;
+}
+
+/* ─── Sparkline Chart (Feature 1) ──────────────────────────── */
+.px-chart-wrap {
+  overflow: hidden;
+  border-radius: var(--px-radius-sm);
+  background: var(--px-surface-3);
+  padding: 6px 4px 2px;
+  line-height: 0;
+}
+.px-chart-wrap svg { display: block; width: 100%; height: auto; }
+.px-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.px-chart-labels span {
+  font-size: 9.5px;
+  color: var(--px-text-4);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Info Icon and Tooltip */
+.px-title-with-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.px-info-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--px-text-4);
+  cursor: help;
+  transition: color 0.15s;
+}
+.px-info-icon:hover {
+  color: var(--px-text-2);
+}
+.px-info-icon[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+}
+.px-info-icon[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+.px-spark-hover-line {
+  pointer-events: none;
+}
+
+/* ─── Alert Threshold Sliders (Feature 10) ──────────────────── */
+.px-threshold-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--px-border-subtle);
+}
+.px-threshold-row:last-child { border-bottom: none; }
+.px-threshold-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.px-threshold-label {
+  font-size: 12px;
+  color: var(--px-text-2);
+  font-weight: 500;
+}
+.px-threshold-val {
+  font-size: 12px;
+  font-weight: 700;
+  color: #f59e0b;
+  font-variant-numeric: tabular-nums;
+  min-width: 32px;
+  text-align: right;
+}
+.px-threshold-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--px-border);
+  outline: none;
+  cursor: pointer;
+  accent-color: #f59e0b;
+}
+.px-threshold-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f59e0b;
+  cursor: pointer;
+  border: 2px solid var(--px-bg);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.px-threshold-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #f59e0b;
+  cursor: pointer;
+  border: 2px solid var(--px-bg);
+}
+
+/* ─── History Panel (Feature 12) ──────────────────────────────── */
+/* ─── Heatmap Layout (Feature 12) ────────────────────────────── */
+.px-heatmap-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.px-heatmap-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.px-heatmap-filter-pill {
+  font-family: monospace;
+  font-size: 9.5px;
+  color: var(--px-text-3);
+  background: var(--px-surface-3);
+  border: 1px solid var(--px-border);
+  padding: 2.5px 8px;
+  border-radius: 12px;
+  user-select: none;
+}
+.px-heatmap-total-est {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--px-text-3);
+}
+.px-heatmap-total-est strong {
+  color: var(--px-text-1);
+  font-weight: 600;
+}
+.px-heatmap-legend {
+  display: flex;
+  align-items: center;
+  gap: 3.5px;
+}
+.px-hm-legend-label {
+  font-family: monospace;
+  font-size: 9px;
+  color: var(--px-text-4);
+  user-select: none;
+}
+.px-heatmap-legend .px-hm-cell {
+  width: 9px;
+  height: 9px;
+  border-radius: 2.5px;
+  flex-shrink: 0;
+}
+.px-heatmap-container {
+  display: flex;
+  align-items: flex-start;
+  background: var(--px-surface);
+  border: 1px solid var(--px-border);
+  border-radius: var(--px-radius);
+  padding: 10px 10px;
+}
+.px-heatmap-y-labels {
+  display: grid;
+  grid-template-rows: repeat(7, 9px);
+  gap: 3px;
+  font-family: monospace;
+  font-size: 8.5px;
+  line-height: 9px;
+  color: var(--px-text-4);
+  text-align: right;
+  margin-right: 8px;
+  user-select: none;
+  width: 20px;
+}
+.px-heatmap {
+  display: grid;
+  grid-template-rows: repeat(7, 9px);
+  grid-auto-flow: column;
+  gap: 3px;
+}
+.px-hm-cell {
+  width: 9px;
+  height: 9px;
+  border-radius: 2.5px;
+  cursor: default;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.px-hm-cell:not(.px-hm-future):hover {
+  transform: scale(1.25);
+  z-index: 10;
+}
+.px-hm-0 { background: #181818; }
+.px-hm-1 { background: rgba(204, 153, 102, 0.2); }
+.px-hm-2 { background: rgba(204, 153, 102, 0.45); }
+.px-hm-3 { background: rgba(204, 153, 102, 0.75); }
+.px-hm-4 { background: var(--px-accent); }
+.px-hm-future {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ─── Daily Log (Feature 12) ────────────────────────────────── */
+.px-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.px-history-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: var(--px-radius-sm);
+  transition: background 0.12s;
+}
+.px-history-row:hover { background: var(--px-surface-3); }
+.px-history-date {
+  font-size: 11px;
+  color: var(--px-text-2);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.px-history-stats {
+  font-size: 10.5px;
+  color: var(--px-text-3);
+  font-variant-numeric: tabular-nums;
+}
+.px-history-empty {
+  font-size: 11.5px;
+  color: var(--px-text-4);
+  text-align: center;
+  padding: 16px 8px;
+  font-style: italic;
+}
+
+/* ─── Top Conversations (Feature 14) ───────────────────────── */
+.px-convo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.px-convo-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.px-convo-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.px-convo-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--px-text-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.px-convo-date {
+  font-size: 10px;
+  color: var(--px-text-4);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.px-convo-bar-wrap {
+  height: 4px;
+  background: var(--px-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.px-convo-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #cc9966, #e6b87a);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.px-convo-meta {
+  font-size: 10.5px;
+  color: var(--px-text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Trend Sparkline Hover Display ────────────────────────── */
+.px-chart-hover-val {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--px-accent);
+  margin-left: auto;
+  text-transform: none;
+  letter-spacing: normal;
+  font-variant-numeric: tabular-nums;
+}
+.px-chart-hover-date {
+  color: var(--px-text-3);
+  margin-right: 3px;
+}
+.px-chart-hover-count {
+  color: var(--px-accent);
+}
+circle.px-spark-point {
+  cursor: pointer;
+  transition: r 0.15s ease, fill 0.15s ease;
+}
+circle.px-spark-point:hover {
+  r: 4.5;
+  fill: #e6b87a;
+}
+
+/* ─── Heatmap Cell Tooltip Positioning ──────────────────────── */
+.px-hm-cell[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 6px);
+  font-size: 10px;
+  padding: 4px 8px;
+  max-width: 200px;
+  white-space: nowrap;
+  background: #1a1a1a;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid #333;
+  left: 50%;
+  transform: translateX(-50%) translateY(3px);
+}
+.px-hm-cell[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
 }
