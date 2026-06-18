@@ -125,7 +125,7 @@
 
     <!-- Today section: Effort breakdown + daily meta (Features 5 & 6) -->
     <div class="px-section" id="px-today-section">
-      <div class="px-section-title">Today</div>
+      <div class="px-section-title">Today <span class="px-model-badge" id="px-today-model-badge" style="display:none"></span></div>
 
       <!-- Effort breakdown bars -->
       <div class="px-effort-list" id="px-effort-list">
@@ -149,6 +149,11 @@
           <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-max" id="px-ef-max" style="width:0%"></div></div>
           <span class="px-effort-count" id="px-ec-max">0</span>
         </div>
+      </div>
+
+      <!-- Effort model context note -->
+      <div class="px-effort-context" id="px-effort-context" style="display:none">
+        <span id="px-effort-context-text"></span>
       </div>
 
       <!-- Daily stat cards (Feature 6) -->

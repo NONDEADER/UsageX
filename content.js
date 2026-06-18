@@ -155,6 +155,7 @@ function freshToday() {
     time_s: 0,
     tokens_est: 0,
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
+    last_model: null,
     processed_msg_uuids: [],
     recent_sent_prompts: []
   };
@@ -398,6 +399,7 @@ async function onMessageSent(req) {
   } catch (_) { }
   const inputChars = promptText.length;
   const { effort, isThinking } = detectEffortAndThinking(parsedBody);
+  const modelId = parsedBody?.model || null;
   const inputTokens = Math.round(inputChars / 4);
   const thinkTokens = isThinking ? effortThinkTokens(effort) : 0;
   const tokenDelta = inputTokens + thinkTokens;
@@ -419,6 +421,7 @@ async function onMessageSent(req) {
     msgs: today.msgs + 1,
     tokens_est: today.tokens_est + tokenDelta,
     effort_breakdown: eb,
+    last_model: modelId || today.last_model || null,
     recent_sent_prompts: recent
   });
 
@@ -574,6 +577,35 @@ async function onConversationHistory(chatMessages, convoId, convoName) {
 function effortThinkTokens(effort) {
   const map = { Low: 250, Medium: 1500, High: 6000, Max: 20000 };
   return map[effort] || 250;
+}
+
+// ─── Model helpers ─────────────────────────────────────────────────────────────
+
+function modelDisplayName(modelId) {
+  if (!modelId) return null;
+  const id = modelId.toLowerCase();
+  if (id.includes('sonnet-4-6')) return 'Sonnet 4.6';
+  if (id.includes('sonnet-4-5')) return 'Sonnet 4.5';
+  if (id.includes('opus-4-8'))   return 'Opus 4.8';
+  if (id.includes('opus-4-7'))   return 'Opus 4.7';
+  if (id.includes('opus-4-6'))   return 'Opus 4.6';
+  if (id.includes('opus-4-5'))   return 'Opus 4.5';
+  if (id.includes('fable'))      return 'Fable 5';
+  if (id.includes('mythos'))     return 'Mythos 5';
+  if (id.includes('haiku'))      return 'Haiku';
+  if (id.includes('sonnet'))     return 'Sonnet';
+  if (id.includes('opus'))       return 'Opus';
+  return null;
+}
+
+function modelSupportsEffort(modelId) {
+  if (!modelId) return false;
+  const id = modelId.toLowerCase();
+  return (
+    id.includes('sonnet-4') || id.includes('opus-4') ||
+    id.includes('fable') || id.includes('mythos') ||
+    id.includes('thinking')
+  );
 }
 
 function detectEffort(parsedBody) {
@@ -1304,6 +1336,38 @@ async function updateUI() {
       root.style.width = '';
     }
   }
+  // ── Effort pills ──
+  const effortSec = root.querySelector('#ux-effort-section');
+  const effortModelBadge = root.querySelector('#ux-effort-model-badge');
+  const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
+  const ebTotal = (eb.low || 0) + (eb.medium || 0) + (eb.high || 0) + (eb.max || 0);
+  if (effortSec) {
+    effortSec.style.display = ebTotal > 0 ? '' : 'none';
+    const epPairs = [
+      ['low',    '#ux-ep-low',  '#ux-epc-low'],
+      ['medium', '#ux-ep-med',  '#ux-epc-med'],
+      ['high',   '#ux-ep-high', '#ux-epc-high'],
+      ['max',    '#ux-ep-max',  '#ux-epc-max'],
+    ];
+    for (const [key, pillSel, countSel] of epPairs) {
+      const cnt = eb[key] || 0;
+      const pillEl = root.querySelector(pillSel);
+      const countEl = root.querySelector(countSel);
+      if (pillEl) pillEl.style.display = cnt > 0 ? '' : 'none';
+      if (countEl) countEl.textContent = String(cnt);
+    }
+  }
+  if (effortModelBadge) {
+    const lastModel = today.last_model || null;
+    const dispName = modelDisplayName(lastModel);
+    if (dispName) {
+      effortModelBadge.textContent = dispName;
+      effortModelBadge.style.display = '';
+    } else {
+      effortModelBadge.style.display = 'none';
+    }
+  }
+
   updatePeakClock();
   checkToastAlerts(sessionPct, weeklyPct, usageRateState, settings);
 }
@@ -2096,6 +2160,18 @@ function getSidebarHTML() {
       <div class="ux-time" id="ux-peak-time"></div>
     </div>
 
+    <div id="ux-effort-section" style="display:none">
+      <div class="ux-effort-sec-header">
+        <span class="ux-bar-label">Today\u2019s effort</span>
+        <span class="ux-effort-model-badge" id="ux-effort-model-badge" style="display:none"></span>
+      </div>
+      <div class="ux-effort-pills">
+        <span class="ux-effort-pill ux-ep-low" id="ux-ep-low" data-tooltip="Low effort messages today">Low <strong id="ux-epc-low">0</strong></span>
+        <span class="ux-effort-pill ux-ep-med" id="ux-ep-med" data-tooltip="Medium effort messages today">Med <strong id="ux-epc-med">0</strong></span>
+        <span class="ux-effort-pill ux-ep-high" id="ux-ep-high" data-tooltip="High effort messages today">High <strong id="ux-epc-high">0</strong></span>
+        <span class="ux-effort-pill ux-ep-max" id="ux-ep-max" data-tooltip="Max effort messages today">Max <strong id="ux-epc-max">0</strong></span>
+      </div>
+    </div>
 
   </div>
 
@@ -3499,6 +3575,52 @@ body.light .ux-toast-close:hover { color: #141413; }
 .ux-help-footer-btn:hover {
   background: rgba(204,153,102,0.16);
   border-color: rgba(204,153,102,0.38);
+}
+
+/* ─── Effort Pills ─────────────────────────────────────── */
+#ux-effort-section {
+  padding: 6px 10px 8px;
+  border-top: 1px solid var(--ux-border-subtle);
+}
+.ux-effort-sec-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+.ux-effort-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.ux-effort-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 10px;
+  line-height: 1.6;
+  cursor: default;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.ux-effort-pill:hover { opacity: 0.85; transform: scale(1.04); }
+.ux-effort-pill strong { font-size: 10.5px; font-weight: 700; }
+.ux-ep-low  { background: rgba(100,116,139,0.2);  color: #94a3b8; border: 1px solid rgba(100,116,139,0.3);  }
+.ux-ep-med  { background: rgba(74,222,128,0.1);   color: #4ade80; border: 1px solid rgba(74,222,128,0.22);  }
+.ux-ep-high { background: rgba(204,153,102,0.12); color: #cc9966; border: 1px solid rgba(204,153,102,0.25); }
+.ux-ep-max  { background: rgba(239,68,68,0.1);    color: #f87171; border: 1px solid rgba(239,68,68,0.22);  }
+.ux-effort-model-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 9px;
+  background: rgba(204,153,102,0.1);
+  color: rgba(204,153,102,0.8);
+  border: 1px solid rgba(204,153,102,0.2);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
   `;
 }
