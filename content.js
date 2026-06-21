@@ -111,18 +111,22 @@ window.__usagex_cleanup = () => {
 // ─── Storage ───────────────────────────────────────────────────────────────────
 
 async function loadToday() {
+  try {
+    await UsageXDB.migrateFromStorage();
+  } catch (err) {
+    console.error('[UsageX] Migration failed:', err);
+  }
   const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits']);
   const todayDate = todayStr();
+  // If date has changed, archive yesterday into IndexedDB and reset today in storage.local
   if (!res.today || res.today.date !== todayDate) {
-    const yesterday = res.today;
-    if (yesterday) {
-      const hist = res.history || [];
-      hist.push(yesterday);
-      if (hist.length > 30) hist.splice(0, hist.length - 30);
-      await browser.storage.local.set({ history: hist });
+    if (res.today && res.today.date) {
+      // Archive yesterday to IndexedDB
+      try { await UsageXDB.saveDailyStats(res.today.date, res.today); } catch (_) {}
     }
-    await browser.storage.local.set({ today: freshToday() });
-    return { today: freshToday(), settings: res.settings || defaultSettings(), usage_limits: res.usage_limits };
+    const fresh = freshToday();
+    await browser.storage.local.set({ today: fresh });
+    return { today: fresh, settings: res.settings || defaultSettings(), usage_limits: res.usage_limits };
   }
   return { today: res.today, settings: res.settings || defaultSettings(), usage_limits: res.usage_limits };
 }
@@ -157,6 +161,7 @@ function freshToday() {
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
     extended_thinking: { on: 0, off: 0 },
     last_model: null,
+    models_used: {},
     processed_msg_uuids: [],
     recent_sent_prompts: []
   };
@@ -335,6 +340,81 @@ function injectFetchHook() {
   (document.head || document.documentElement).appendChild(script);
 }
 
+// ─── Account management & migration helpers ───────────────────────────────────
+
+function sanitizeAccountId(id) {
+  if (!id) return '';
+  return String(id).replace(/[^a-zA-Z0-9_]/g, '_');
+}
+
+async function switchAccount(oldAccountId, newAccountId) {
+  const storage = typeof browser !== "undefined" ? browser.storage : chrome.storage;
+  
+  // 1. Save current live stats to the old account's namespace
+  if (oldAccountId) {
+    const liveData = await storage.local.get(['today', 'usage_limits', 'conv_stats']);
+    const archive = {};
+    if (liveData.today) archive[`today_${oldAccountId}`] = liveData.today;
+    if (liveData.usage_limits) archive[`usage_limits_${oldAccountId}`] = liveData.usage_limits;
+    if (liveData.conv_stats) archive[`conv_stats_${oldAccountId}`] = liveData.conv_stats;
+    await storage.local.set(archive);
+  }
+
+  // 2. Load the new account's stats
+  const newData = await storage.local.get([
+    `today_${newAccountId}`,
+    `usage_limits_${newAccountId}`,
+    `conv_stats_${newAccountId}`
+  ]);
+
+  const updates = {
+    active_account_id: newAccountId,
+    today: newData[`today_${newAccountId}`] || freshToday(),
+    usage_limits: newData[`usage_limits_${newAccountId}`] || {},
+    conv_stats: newData[`conv_stats_${newAccountId}`] || {}
+  };
+
+  await storage.local.set(updates);
+
+  if (typeof updateUI === 'function') {
+    await updateUI();
+  }
+}
+
+async function handleUserInfo(uuid, email) {
+  const accountId = sanitizeAccountId(uuid || email);
+  if (!accountId) return;
+
+  const storage = typeof browser !== "undefined" ? browser.storage : chrome.storage;
+  const res = await storage.local.get(['active_account_id', 'first_account_id']);
+  const currentActive = res.active_account_id;
+  let firstAccount = res.first_account_id;
+
+  if (!firstAccount) {
+    firstAccount = accountId;
+    await storage.local.set({ first_account_id: accountId });
+  }
+
+  if (currentActive === accountId) {
+    return;
+  }
+
+  console.log('[UsageX] Account switch detected from', currentActive, 'to', accountId);
+
+  if (!currentActive) {
+    if (accountId === firstAccount) {
+      await storage.local.set({ active_account_id: accountId });
+      if (typeof updateUI === 'function') {
+        await updateUI();
+      }
+    } else {
+      await switchAccount(currentActive, accountId);
+    }
+  } else {
+    await switchAccount(currentActive, accountId);
+  }
+}
+
 windowMsgHandler = (event) => {
   if (event.source !== window) return;
   if (event.data.type === '__ux_fetch_msg') {
@@ -348,12 +428,17 @@ windowMsgHandler = (event) => {
     })().catch(() => { });
   } else if (event.data.type === '__ux_convo_history') {
     onConversationHistory(event.data.data, event.data.convoId || null, event.data.convoName || null, event.data.modelId || null, event.data.thinkingMode || null).catch(() => { });
+  } else if (event.data.type === '__ux_user_info') {
+    handleUserInfo(event.data.uuid, event.data.email).catch(() => { });
   }
 };
 window.addEventListener('message', windowMsgHandler);
 
 storageOnChangedHandler = (changes, area) => {
   if (area !== 'local') return;
+  
+  let needsUIUpdate = false;
+  
   if (changes.settings) {
     const oldVal = changes.settings.oldValue || {};
     const newVal = changes.settings.newValue || {};
@@ -363,6 +448,14 @@ storageOnChangedHandler = (changes, area) => {
     if (oldVal.alert_weekly_threshold !== newVal.alert_weekly_threshold) {
       alertedFlags.weekly80 = false;
     }
+    needsUIUpdate = true;
+  }
+  
+  if (changes.today || changes.active_account_id || changes.usage_limits) {
+    needsUIUpdate = true;
+  }
+  
+  if (needsUIUpdate) {
     updateUI().catch(() => { });
   }
 };
@@ -421,6 +514,7 @@ async function onMessageSent(req) {
   const effortKey = effort.toLowerCase();
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
   const et = today.extended_thinking || { on: 0, off: 0 };
+  const mu = today.models_used || {};
 
   // Count effort breakdown independently of thinking state.
   // When thinking is off, effort is still set (e.g. "low") and should be tracked.
@@ -435,6 +529,10 @@ async function onMessageSent(req) {
       et.off = (et.off || 0) + 1;
     }
   }
+  // Track per-model message count
+  if (lastModelToUse) {
+    mu[lastModelToUse] = (mu[lastModelToUse] || 0) + 1;
+  }
 
   await saveToday({
     msgs: today.msgs + 1,
@@ -442,6 +540,7 @@ async function onMessageSent(req) {
     effort_breakdown: eb,
     extended_thinking: et,
     last_model: lastModelToUse,
+    models_used: mu,
     recent_sent_prompts: recent
   });
 
@@ -451,19 +550,16 @@ async function onMessageSent(req) {
     const convRes = await browser.storage.local.get('conv_stats');
     const convStats = convRes.conv_stats || {};
     const existing = convStats[convoId] || { msgs: 0, tokens_est: 0, started_at: Date.now(), name: null };
-    convStats[convoId] = {
+    const updatedConvo = {
       ...existing,
       msgs: existing.msgs + 1,
       tokens_est: existing.tokens_est + tokenDelta,
       last_active: Date.now()
     };
-    // Cap at 200 entries: evict oldest by last_active
-    const ids = Object.keys(convStats);
-    if (ids.length > 200) {
-      ids.sort((a, b) => (convStats[a].last_active || 0) - (convStats[b].last_active || 0));
-      delete convStats[ids[0]];
-    }
+    convStats[convoId] = updatedConvo;
     await browser.storage.local.set({ conv_stats: convStats });
+    // Also sync to IndexedDB for popup history
+    await UsageXDB.saveConvoStats(convoId, updatedConvo).catch(() => {});
   }
 
   updateUI().catch(() => { });
@@ -490,6 +586,7 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
   let newTokenDelta = 0;
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
   const et = today.extended_thinking || { on: 0, off: 0 };
+  const mu = today.models_used || {};
 
   const isMessageToday = (dateStr) => {
     try {
@@ -592,12 +689,17 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
     if (today.processed_msg_uuids.length > 500) {
       today.processed_msg_uuids.splice(0, today.processed_msg_uuids.length - 500);
     }
+    // Track per-model message count for conversation history sync
+    if (activeModel && newMsgs > 0) {
+      mu[activeModel] = (mu[activeModel] || 0) + newMsgs;
+    }
     await saveToday({
       msgs: today.msgs + newMsgs,
       tokens_est: today.tokens_est + newTokenDelta,
       effort_breakdown: eb,
       extended_thinking: et,
       last_model: activeModel,
+      models_used: mu,
       processed_msg_uuids: today.processed_msg_uuids,
       recent_sent_prompts: today.recent_sent_prompts
     });
@@ -607,14 +709,17 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
       const convRes = await browser.storage.local.get('conv_stats');
       const convStats = convRes.conv_stats || {};
       const existing = convStats[convoId] || { msgs: 0, tokens_est: 0, started_at: Date.now(), name: null };
-      convStats[convoId] = {
+      const updatedConvo = {
         ...existing,
         msgs: existing.msgs + newMsgs,
         tokens_est: existing.tokens_est + newTokenDelta,
         last_active: Date.now(),
         name: convoName || existing.name || null
       };
+      convStats[convoId] = updatedConvo;
       await browser.storage.local.set({ conv_stats: convStats });
+      // Also sync to IndexedDB for popup history
+      await UsageXDB.saveConvoStats(convoId, updatedConvo).catch(() => {});
     }
 
     updateUI().catch(() => { });
@@ -645,6 +750,15 @@ function modelDisplayName(modelId) {
   if (id.includes('sonnet')) return 'Sonnet';
   if (id.includes('opus')) return 'Opus';
   return null;
+}
+
+function modelPillClass(modelId) {
+  if (!modelId) return 'ux-model-pill-other';
+  const id = modelId.toLowerCase();
+  if (id.includes('sonnet')) return 'ux-model-pill-sonnet';
+  if (id.includes('opus')) return 'ux-model-pill-opus';
+  if (id.includes('haiku')) return 'ux-model-pill-haiku';
+  return 'ux-model-pill-other';
 }
 
 function modelSupportsExtendedToggle(modelId) {
@@ -1480,15 +1594,33 @@ async function updateUI() {
     }
   }
 
-  if (effortModelBadge) {
-    const dispName = modelDisplayName(lastModel);
-    if (dispName) {
-      effortModelBadge.textContent = dispName;
-      effortModelBadge.style.display = '';
+  // Render model pills row (all models used today)
+  const modelPillsRow = root.querySelector('#ux-model-pills-row');
+  if (modelPillsRow) {
+    const mu = today.models_used || {};
+    const modelEntries = Object.entries(mu).filter(([, c]) => c > 0);
+    // Fallback: if no models_used, show last_model as single pill
+    if (modelEntries.length === 0 && lastModel) {
+      modelEntries.push([lastModel, 0]);
+    }
+    if (modelEntries.length > 0) {
+      modelPillsRow.innerHTML = modelEntries
+        .sort((a, b) => b[1] - a[1])
+        .map(([mid]) => {
+          const name = modelDisplayName(mid);
+          if (!name) return '';
+          const cls = modelPillClass(mid);
+          return `<span class="ux-model-pill ${cls}">${name}</span>`;
+        })
+        .filter(Boolean)
+        .join('');
+      modelPillsRow.style.display = '';
     } else {
-      effortModelBadge.style.display = 'none';
+      modelPillsRow.style.display = 'none';
     }
   }
+  // Keep legacy badge hidden — replaced by pill row
+  if (effortModelBadge) effortModelBadge.style.display = 'none';
 
   const extendedRow = root.querySelector('#ux-extended-row');
   if (extendedRow) {
@@ -2027,7 +2159,8 @@ function bindEvents() {
   });
 
   root.querySelector('#ux-btn-reset')?.addEventListener('click', async () => {
-    await browser.storage.local.set({ today: freshToday(), history: [] });
+    await browser.storage.local.set({ today: freshToday() });
+    await UsageXDB.clearAllStats().catch(() => {});
     await updateUI();
   });
 
@@ -2178,8 +2311,23 @@ function bindEvents() {
 // ─── Export helpers ────────────────────────────────────────────────────────────
 
 async function exportData() {
-  const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits', 'debug_logs']);
-  download('usagex-export.json', JSON.stringify(res, null, 2));
+  const localData = await browser.storage.local.get(['today', 'settings', 'usage_limits', 'debug_logs', 'conv_stats']);
+  const dailyStats = await UsageXDB.getAllDailyStats();
+  const convoStats = await UsageXDB.getAllConvoStats();
+  
+  // Merge conv_stats from storage.local (live) with IndexedDB (archived)
+  const mergedConvStats = convoStats.reduce((acc, curr) => {
+    acc[curr.convoId] = curr;
+    return acc;
+  }, {});
+  Object.assign(mergedConvStats, localData.conv_stats || {});
+
+  const exportPayload = {
+    ...localData,
+    history: dailyStats,
+    conv_stats: mergedConvStats
+  };
+  download('usagex-export.json', JSON.stringify(exportPayload, null, 2));
 }
 
 function download(filename, text) {
@@ -2301,6 +2449,7 @@ function getSidebarHTML() {
         <span class="ux-bar-label">Today\u2019s effort</span>
         <span class="ux-effort-model-badge" id="ux-effort-model-badge" style="display:none"></span>
       </div>
+      <div class="ux-model-pills-row" id="ux-model-pills-row" style="display:none"></div>
       <div class="ux-effort-pills">
         <span class="ux-effort-pill ux-ep-low" id="ux-ep-low" data-tooltip="Low effort messages today">Low <strong id="ux-epc-low">0</strong></span>
         <span class="ux-effort-pill ux-ep-med" id="ux-ep-med" data-tooltip="Medium effort messages today">Med <strong id="ux-epc-med">0</strong></span>
@@ -3752,6 +3901,45 @@ body.light .ux-toast-close:hover { color: #141413; }
 .ux-ep-med  { background: rgba(74,222,128,0.1);   color: #4ade80; border: 1px solid rgba(74,222,128,0.22);  }
 .ux-ep-high { background: rgba(204,153,102,0.12); color: #cc9966; border: 1px solid rgba(204,153,102,0.25); }
 .ux-ep-max  { background: rgba(239,68,68,0.1);    color: #f87171; border: 1px solid rgba(239,68,68,0.22);  }
+/* ─── Model Pills ───────────────────────────────────────────── */
+.ux-model-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 7px;
+}
+.ux-model-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.ux-model-pill-sonnet {
+  background: rgba(204, 153, 102, 0.13);
+  color: #cc9966;
+  border-color: rgba(204, 153, 102, 0.28);
+}
+.ux-model-pill-opus {
+  background: rgba(167, 139, 250, 0.13);
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.28);
+}
+.ux-model-pill-haiku {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.25);
+}
+.ux-model-pill-other {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
 .ux-effort-model-badge {
   font-size: 9px;
   font-weight: 700;
@@ -3810,9 +3998,10 @@ body.light .ux-toast-close:hover { color: #141413; }
 async function fetchUsageLimitsActive() {
   try {
     let orgId = document.cookie.split('; ').find(row => row.startsWith('lastActiveOrg='))?.split('=')[1] || null;
+    let orgName = null;
 
     if (!orgId) {
-      const orgsRes = await fetch('/api/organizations');
+      const orgsRes = await fetch(window.location.origin + '/api/organizations');
       if (!orgsRes.ok) {
         await debugLog('active_fetch_failed', { status: orgsRes.status, stage: 'organizations' });
         return;
@@ -3823,6 +4012,7 @@ async function fetchUsageLimitsActive() {
         return;
       }
       orgId = orgs[0].uuid;
+      orgName = orgs[0].name || null;
     }
 
     if (!orgId) {
@@ -3830,7 +4020,10 @@ async function fetchUsageLimitsActive() {
       return;
     }
 
-    const usageRes = await fetch(`/api/organizations/${orgId}/usage`);
+    // Use the org UUID as the account identifier — proven to work, unlike /api/me (404)
+    await handleUserInfo(orgId, orgName);
+
+    const usageRes = await fetch(window.location.origin + `/api/organizations/${orgId}/usage`);
     if (!usageRes.ok) {
       await debugLog('active_fetch_failed', { status: usageRes.status, stage: 'usage', orgId });
       return;
@@ -3866,6 +4059,8 @@ function pollUsageLimits() {
 async function init() {
   injectFetchHook();
   setupKeyboardShortcut();
+
+  // fetchUsageLimitsActive handles both account detection and usage limits
   await fetchUsageLimitsActive().catch(() => { });
 
   let attempts = 0;

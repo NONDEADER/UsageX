@@ -1,4 +1,15 @@
 (function() {
+  let cachedUserInfo = null;
+
+  window.addEventListener('message', (event) => {
+    if (event.source !== window) return;
+    if (event.data.type === '__ux_request_user_info') {
+      if (cachedUserInfo) {
+        window.postMessage({ type: '__ux_user_info', ...cachedUserInfo }, '*');
+      }
+    }
+  });
+
   const origFetch = window.fetch;
   window.fetch = async function(...args) {
     const res = await origFetch.apply(this, args);
@@ -46,14 +57,20 @@
         })().catch(() => {});
       }
       
-      // Intercept usage limits/stats from Claude's organization API calls
-      const checkUrl = url.includes('/api/organizations');
+      // Intercept usage limits/stats from Claude's organization/me API calls
+      const checkUrl = url.includes('/api/organizations') || url.includes('/api/me') || url.includes('/chat_conversations');
       if (checkUrl) {
         const clone = res.clone();
         clone.text().then(function(text) {
           try {
             const json = JSON.parse(text);
             if (typeof json !== 'object' || json === null) return;
+
+            // Intercept current user info
+            if (url.includes('/api/me') && json.uuid) {
+              cachedUserInfo = { uuid: json.uuid, email: json.email_address };
+              window.postMessage({ type: '__ux_user_info', ...cachedUserInfo }, '*');
+            }
             
             // Intercept conversation history (GET /chat_conversations/{uuid})
             if (url.includes('/chat_conversations/') && Array.isArray(json.chat_messages)) {

@@ -16,6 +16,7 @@ function freshToday() {
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
     extended_thinking: { on: 0, off: 0 },
     last_model: null,
+    models_used: {},
     processed_msg_uuids: [],
     recent_sent_prompts: []
   };
@@ -37,6 +38,15 @@ function modelDisplayName(modelId) {
   if (id.includes('sonnet')) return 'Sonnet';
   if (id.includes('opus')) return 'Opus';
   return null;
+}
+
+function modelPillClass(modelId) {
+  if (!modelId) return 'px-model-pill-other';
+  const id = modelId.toLowerCase();
+  if (id.includes('sonnet')) return 'px-model-pill-sonnet';
+  if (id.includes('opus')) return 'px-model-pill-opus';
+  if (id.includes('haiku')) return 'px-model-pill-haiku';
+  return 'px-model-pill-other';
 }
 
 function modelSupportsExtendedToggle(modelId) {
@@ -186,11 +196,16 @@ function initTabs() {
 // ─── Dashboard ───────────────────────────────────────────────────────────────
 
 async function refreshDashboard() {
-  const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs', 'history', 'settings']);
+  // today is live — shared via chrome.storage.local between content.js and popup.js
+  const todayDate = todayStr();
+  const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs', 'settings']);
   const today = res.today || freshToday();
   const limits = res.usage_limits || {};
-  const history = res.history || [];
   const settings = res.settings || {};
+
+  // history is archived — stored in IndexedDB (extension origin, accessible by popup)
+  const allHistory = await UsageXDB.getAllDailyStats();
+  const pastDays = allHistory.filter(d => d.date !== todayDate);
 
   // ── Status banner + live dot ──
   const { inPeak, isWeekend } = getPeakStatus();
@@ -341,22 +356,37 @@ async function refreshDashboard() {
     if (count) count.textContent = String(cnt);
   }
 
-  // Model Badge & Context note
+  // Model Pills Row (all models used today) & Context note
   const lastModel = today.last_model || null;
-  const displayName = modelDisplayName(lastModel);
   const supportsEffortLevel = modelSupportsEffortLevel(lastModel);
   const supportsExtended = modelSupportsExtendedToggle(lastModel);
-  const modelBadge = el('px-today-model-badge');
+  const modelPillsRow = el('px-today-model-pills');
   const effortContext = el('px-effort-context');
   const effortContextText = el('px-effort-context-text');
   const effortList = el('px-effort-list');
 
-  if (modelBadge) {
-    if (displayName) {
-      modelBadge.textContent = displayName;
-      modelBadge.style.display = '';
+  if (modelPillsRow) {
+    const mu = today.models_used || {};
+    const modelEntries = Object.entries(mu).filter(([, c]) => c > 0);
+    // Fallback: if no models_used, show last_model as single pill
+    if (modelEntries.length === 0 && lastModel) {
+      modelEntries.push([lastModel, 0]);
+    }
+
+    if (modelEntries.length > 0) {
+      modelPillsRow.innerHTML = modelEntries
+        .sort((a, b) => b[1] - a[1])
+        .map(([mid]) => {
+          const name = modelDisplayName(mid);
+          if (!name) return '';
+          const cls = modelPillClass(mid);
+          return `<span class="px-model-pill ${cls}">${name}</span>`;
+        })
+        .filter(Boolean)
+        .join('');
+      modelPillsRow.style.display = 'flex';
     } else {
-      modelBadge.style.display = 'none';
+      modelPillsRow.style.display = 'none';
     }
   }
 
@@ -415,7 +445,7 @@ async function refreshDashboard() {
   }
 
   // ── Feature 1: Sparkline ──
-  renderSparkline(history, today);
+  renderSparkline(pastDays, today);
 
   // ── Feature 10: sync threshold sliders from settings ──
   const sessSlider = el('px-thresh-session');
@@ -610,12 +640,15 @@ function renderSparkline(history, today) {
 // ─── History Panel (Features 12 & 14) ────────────────────────────────────────
 
 async function initHistory() {
-  const res = await browser.storage.local.get(['history', 'today', 'conv_stats']);
-  const history = res.history || [];
-  const today = res.today || freshToday();
-  const convStats = res.conv_stats || {};
+  // today is live from storage.local; past days come from IndexedDB
+  const todayDate = todayStr();
+  const resLocal = await browser.storage.local.get(['today', 'conv_stats']);
+  const today = resLocal.today || freshToday();
+  const allHistory = await UsageXDB.getAllDailyStats();
+  const topConvos = await UsageXDB.getTopConversations(5);
 
-  const allDays = [...history, today].filter(Boolean);
+  const pastDays = allHistory.filter(d => d.date !== todayDate);
+  const allDays = [...pastDays, today].filter(Boolean);
 
   // Compute total tokens for the header
   const totalTok = allDays.reduce((sum, d) => sum + (d.tokens_est || 0), 0);
@@ -629,8 +662,8 @@ async function initHistory() {
   }
 
   renderHeatmap(allDays);
-  renderTopConversations(convStats);
-  renderDailyLog([...history].reverse());
+  renderTopConversations(topConvos);
+  renderDailyLog([...pastDays].reverse());
 }
 
 function renderHeatmap(days) {
@@ -690,17 +723,12 @@ function renderHeatmap(days) {
   el_.innerHTML = cells.join('');
 }
 
-function renderTopConversations(convStats) {
+function renderTopConversations(entries) {
   const listEl = el('px-convo-list');
   const section = el('px-convos-section');
   if (!listEl) return;
 
-  const entries = Object.entries(convStats)
-    .map(([id, v]) => ({ id, ...v }))
-    .sort((a, b) => (b.tokens_est || 0) - (a.tokens_est || 0))
-    .slice(0, 5);
-
-  if (entries.length === 0) {
+  if (!entries || entries.length === 0) {
     if (section) section.style.display = 'none';
     return;
   }
@@ -732,18 +760,83 @@ function renderDailyLog(historyDesc) {
     listEl.innerHTML = '<div class="px-history-empty">No history yet. Use Claude to build history.</div>';
     return;
   }
-  listEl.innerHTML = historyDesc.map(d => `
-    <div class="px-history-row">
-      <span class="px-history-date">${d.date || '—'}</span>
-      <span class="px-history-stats">${d.msgs || 0} msgs · ~${formatTokens(d.tokens_est || 0)} tok · ${formatDuration(d.time_s)}</span>
-    </div>`).join('');
+  listEl.innerHTML = historyDesc.map(d => {
+    const mu = d.models_used || {};
+    const lastModel = d.last_model || null;
+    let modelEntries = Object.entries(mu).filter(([, c]) => c > 0);
+    if (modelEntries.length === 0 && lastModel) {
+      modelEntries.push([lastModel, 0]);
+    }
+
+    let pillsHtml = '';
+    if (modelEntries.length > 0) {
+      pillsHtml = modelEntries
+        .sort((a, b) => b[1] - a[1])
+        .map(([mid]) => {
+          const name = modelDisplayName(mid);
+          if (!name) return '';
+          const cls = modelPillClass(mid);
+          return `<span class="px-model-pill ${cls}">${name}</span>`;
+        })
+        .filter(Boolean)
+        .join('');
+    }
+
+    const eb = d.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
+    const et = d.extended_thinking || { on: 0, off: 0 };
+    const hasEffort = (eb.low || 0) + (eb.medium || 0) + (eb.high || 0) + (eb.max || 0) > 0;
+    const hasThinking = (et.on || 0) + (et.off || 0) > 0;
+
+    let metricsHtml = '';
+    if (hasEffort || hasThinking) {
+      let subparts = [];
+      if (hasEffort) {
+        subparts.push(`Effort: Low ${eb.low || 0} &middot; Med ${eb.medium || 0} &middot; High ${eb.high || 0} &middot; Max ${eb.max || 0}`);
+      }
+      if (hasThinking) {
+        subparts.push(`Thinking: ON ${et.on || 0} &middot; OFF ${et.off || 0}`);
+      }
+      metricsHtml = `<div class="px-history-detail-metrics">${subparts.join(' &nbsp;&middot;&nbsp; ')}</div>`;
+    }
+
+    const hasDetails = pillsHtml || metricsHtml;
+
+    return `
+      <div class="px-history-row ${hasDetails ? 'px-history-expandable' : ''}" ${hasDetails ? 'onclick="this.classList.toggle(\'expanded\')"' : ''}>
+        <div class="px-history-summary">
+          <span class="px-history-date">${d.date || '—'}</span>
+          <span class="px-history-stats">${d.msgs || 0} msgs · ~${formatTokens(d.tokens_est || 0)} tok · ${formatDuration(d.time_s)}</span>
+        </div>
+        ${hasDetails ? `
+        <div class="px-history-details">
+          ${pillsHtml ? `<div class="px-model-pills-row">${pillsHtml}</div>` : ''}
+          ${metricsHtml}
+        </div>` : ''}
+      </div>`;
+  }).join('');
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
 
 async function exportData() {
-  const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits', 'debug_logs']);
-  const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+  const localData = await browser.storage.local.get(['today', 'settings', 'usage_limits', 'debug_logs', 'conv_stats']);
+  const dailyStats = await UsageXDB.getAllDailyStats();
+  const convoStats = await UsageXDB.getAllConvoStats();
+  
+  // Merge conv_stats: IndexedDB is archived, storage.local has live conversations
+  const mergedConvStats = convoStats.reduce((acc, curr) => {
+    acc[curr.convoId] = curr;
+    return acc;
+  }, {});
+  Object.assign(mergedConvStats, localData.conv_stats || {});
+
+  const exportPayload = {
+    ...localData,
+    history: dailyStats,
+    conv_stats: mergedConvStats
+  };
+  
+  const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -758,8 +851,8 @@ async function openDebugViewer() {
 }
 
 async function resetTodayStats() {
-  const histRes = await browser.storage.local.get('history');
-  await browser.storage.local.set({ today: freshToday(), history: histRes.history || [] });
+  await browser.storage.local.set({ today: freshToday() });
+  await UsageXDB.saveDailyStats(todayStr(), freshToday()).catch(() => {});
   await refreshDashboard();
   showFeedback('px-action-feedback', '✓ Daily counters reset');
 }
@@ -850,12 +943,24 @@ async function init() {
   initOpenClaude();
   await refreshDashboard();
 
-  // Lazy-load History tab on first click
+  // Listen for storage changes to refresh dashboard/history live
+  browser.storage.onChanged.addListener((changes, area) => {
+    if (area !== 'local') return;
+    if (changes.today || changes.usage_limits || changes.active_account_id) {
+      refreshDashboard().catch(() => {});
+      const histTab = el('tab-history');
+      if (histTab && histTab.classList.contains('px-tab-active')) {
+        initHistory().catch(() => {});
+      }
+    }
+  });
+
+  // Load History tab data on click to ensure stats are always fresh
   const histTab = el('tab-history');
   if (histTab) {
     histTab.addEventListener('click', () => {
       initHistory().catch(() => { });
-    }, { once: true });
+    });
   }
 
   // Auto-switch to a specific tab if requested via URL param or storage flag

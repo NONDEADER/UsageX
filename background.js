@@ -4,21 +4,6 @@ if (typeof browser === "undefined") {
   var browser = chrome;
 }
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
-
-function freshToday() {
-  return {
-    date: todayStr(),
-    msgs: 0,
-    convos: 0,
-    time_s: 0,
-    tokens_est: 0,
-    effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
-    processed_msg_uuids: [],
-    recent_sent_prompts: [],
-  };
-}
-
 function defaultSettings() {
   return {
     debug_logging: false,
@@ -40,51 +25,12 @@ function defaultSettings() {
   };
 }
 
-function scheduleMidnightAlarm() {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 10, 0);
-  const delayMs = midnight.getTime() - now.getTime();
-  const delayMins = delayMs / 60_000;
-  browser.alarms.create('usagex-midnight', { delayInMinutes: delayMins });
-}
-
-async function handleMidnightReset() {
-  const res = await browser.storage.local.get(['today', 'history', 'settings']);
-  const today = res.today || freshToday();
-  const history = res.history || [];
-
-  if (today.date && today.date !== todayStr()) {
-    history.push(today);
-    if (history.length > 30) history.splice(0, history.length - 30);
-  }
-
-  const newToday = freshToday();
-
-  await browser.storage.local.set({
-    today: newToday,
-    history: history,
-  });
-
-  scheduleMidnightAlarm();
-}
-
 browser.runtime.onInstalled.addListener(async () => {
-  const res = await browser.storage.local.get(['today', 'settings']);
-  if (!res.today) await browser.storage.local.set({ today: freshToday() });
+  const res = await browser.storage.local.get('settings');
   if (!res.settings) await browser.storage.local.set({ settings: defaultSettings() });
-  scheduleMidnightAlarm();
-});
-
-browser.runtime.onStartup.addListener(() => {
-  scheduleMidnightAlarm();
 });
 
 browser.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name === 'usagex-midnight') {
-    handleMidnightReset();
-    return;
-  }
 
   const res = await browser.storage.local.get(['settings', 'usage_limits']);
   const settings = res.settings || defaultSettings();
@@ -129,6 +75,31 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
 
 browser.storage.onChanged.addListener(async (changes, area) => {
   if (area !== 'local') return;
+
+  // Mirror live keys to namespaced keys of the active account
+  const liveKeys = ['today', 'usage_limits', 'conv_stats'];
+  const keysToMirror = {};
+  let hasMirrorChange = false;
+
+  for (const key of liveKeys) {
+    if (changes[key] && changes[key].newValue !== undefined) {
+      keysToMirror[key] = changes[key].newValue;
+      hasMirrorChange = true;
+    }
+  }
+
+  if (hasMirrorChange) {
+    try {
+      const res = await browser.storage.local.get('active_account_id');
+      if (res && res.active_account_id) {
+        const updates = {};
+        for (const [key, val] of Object.entries(keysToMirror)) {
+          updates[`${key}_${res.active_account_id}`] = val;
+        }
+        await browser.storage.local.set(updates);
+      }
+    } catch (_) {}
+  }
 
   // 1. Clean up alarms if browser notifications are disabled
   if (changes.settings) {

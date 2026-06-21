@@ -544,6 +544,46 @@ body {
   text-transform: uppercase;
 }
 
+/* ─── Model Pills Row & Pills ─── */
+.px-model-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 0 4px;
+}
+.px-model-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+.px-model-pill-sonnet {
+  background: rgba(204, 153, 102, 0.13);
+  color: #cc9966;
+  border-color: rgba(204, 153, 102, 0.28);
+}
+.px-model-pill-opus {
+  background: rgba(167, 139, 250, 0.13);
+  color: #a78bfa;
+  border-color: rgba(167, 139, 250, 0.28);
+}
+.px-model-pill-haiku {
+  background: rgba(52, 211, 153, 0.12);
+  color: #34d399;
+  border-color: rgba(52, 211, 153, 0.25);
+}
+.px-model-pill-other {
+  background: rgba(148, 163, 184, 0.1);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
 .px-effort-context {
   font-size: 10px;
   color: var(--px-text-3);
@@ -1555,15 +1595,45 @@ kbd {
 
 .px-history-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 5px 6px;
+  flex-direction: column;
+  align-items: stretch;
+  padding: 6px 8px;
   border-radius: var(--px-radius-sm);
   transition: background 0.12s;
 }
 
+.px-history-row.px-history-expandable {
+  cursor: pointer;
+}
+
 .px-history-row:hover {
   background: var(--px-surface-3);
+}
+
+.px-history-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.px-history-details {
+  display: none;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--px-border);
+}
+
+.px-history-row.expanded .px-history-details {
+  display: flex;
+}
+
+.px-history-detail-metrics {
+  font-size: 10px;
+  color: var(--px-text-3);
+  padding: 0 4px;
 }
 
 .px-history-date {

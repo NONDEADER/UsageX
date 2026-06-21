@@ -24,7 +24,15 @@
         "https://claude.ai/*",
         "https://www.claude.ai/*"
       ],
-      "js": ["content.js"],
+      "js": ["inject-loader.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*"
+      ],
+      "js": ["db.js", "content.js"],
       "run_at": "document_idle"
     }
   ],

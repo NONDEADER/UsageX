@@ -140,8 +140,8 @@
 
     <!-- Today section: Effort breakdown + daily meta (Features 5 & 6) -->
     <div class="px-section" id="px-today-section">
-      <div class="px-section-title">Today <span class="px-model-badge" id="px-today-model-badge"
-          style="display:none"></span></div>
+      <div class="px-section-title">Today</div>
+      <div class="px-model-pills-row" id="px-today-model-pills" style="display:none"></div>
 
       <!-- Effort breakdown bars -->
       <div class="px-effort-list" id="px-effort-list">
@@ -355,7 +355,7 @@
         </div>
         <div class="px-info-row">
           <span class="px-info-label">Data stored</span>
-          <span class="px-info-val">Local only</span>
+          <span class="px-info-val">Local IndexedDB</span>
         </div>
         <div class="px-info-row">
           <span class="px-info-label">Network calls</span>
@@ -642,32 +642,39 @@
         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-        Privacy
+        Privacy & Data Storage
       </div>
       <div class="px-guide-privacy">
         <div class="px-guide-privacy-row">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>All data stored in <code>browser.storage.local</code> — on your device only</span>
+          <span>Stored in a local, private browser database (IndexedDB) on your computer</span>
         </div>
         <div class="px-guide-privacy-row">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>UsageX makes <strong>zero</strong> network calls of its own</span>
+          <span>Your data is never uploaded, shared, or sent to any external server</span>
         </div>
         <div class="px-guide-privacy-row">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          <span>No third-party libraries · no analytics · no telemetry</span>
+          <span>Offline database is secure and sandboxed — websites cannot access it</span>
+        </div>
+        <div class="px-guide-privacy-row">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span>Zero analytics, trackers, cookies, or telemetry are used in this extension</span>
         </div>
       </div>
     </div>
 
   </div>
 
+  <script src="db.js"></script>
   <script src="popup.js"></script>
 </body>
 
