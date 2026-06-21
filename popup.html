@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,22 +10,25 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <!-- Header -->
   <div class="px-header">
     <div class="px-header-logo">
-      <svg class="px-logo-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="m12 14 4-4"/>
-        <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+      <svg class="px-logo-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="m12 14 4-4" />
+        <path d="M3.34 19a10 10 0 1 1 17.32 0" />
       </svg>
       <div class="px-live-dot" id="px-live-dot"></div>
     </div>
     <span class="px-header-title">UsageX <span class="px-header-v">v2</span></span>
     <a class="px-header-claude-btn" id="px-open-claude" href="#" data-tooltip="Open Claude.ai">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-        <polyline points="15 3 21 3 21 9"/>
-        <line x1="10" y1="14" x2="21" y2="3"/>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+        <polyline points="15 3 21 3 21 9" />
+        <line x1="10" y1="14" x2="21" y2="3" />
       </svg>
       Open Claude
     </a>
@@ -50,30 +54,38 @@
 
   <!-- Tab Nav -->
   <div class="px-tabs" role="tablist">
-    <button class="px-tab px-tab-active" id="tab-dashboard" role="tab" aria-selected="true" aria-controls="panel-dashboard">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
-        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+    <button class="px-tab px-tab-active" id="tab-dashboard" role="tab" aria-selected="true"
+      aria-controls="panel-dashboard">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
       </svg>
       Dashboard
     </button>
     <button class="px-tab" id="tab-tools" role="tab" aria-selected="false" aria-controls="panel-tools">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path
+          d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
       </svg>
       Tools
     </button>
     <button class="px-tab" id="tab-history" role="tab" aria-selected="false" aria-controls="panel-history">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
       </svg>
       History
     </button>
     <button class="px-tab" id="tab-help" role="tab" aria-selected="false" aria-controls="panel-help">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/>
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
-        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+        <line x1="12" y1="17" x2="12.01" y2="17" />
       </svg>
       Help
     </button>
@@ -84,8 +96,11 @@
 
     <!-- Status banner -->
     <div class="px-status-banner px-status-inactive" id="px-status-banner">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="8" x2="12" y2="12" />
+        <line x1="12" y1="16" x2="12.01" y2="16" />
       </svg>
       <span id="px-status-text">Open claude.ai to track usage</span>
     </div>
@@ -125,28 +140,37 @@
 
     <!-- Today section: Effort breakdown + daily meta (Features 5 & 6) -->
     <div class="px-section" id="px-today-section">
-      <div class="px-section-title">Today <span class="px-model-badge" id="px-today-model-badge" style="display:none"></span></div>
+      <div class="px-section-title">Today <span class="px-model-badge" id="px-today-model-badge"
+          style="display:none"></span></div>
 
       <!-- Effort breakdown bars -->
       <div class="px-effort-list" id="px-effort-list">
         <div class="px-effort-row">
           <span class="px-effort-label px-effort-low">Low</span>
-          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-low" id="px-ef-low" style="width:0%"></div></div>
+          <div class="px-effort-track">
+            <div class="px-effort-fill px-effort-fill-low" id="px-ef-low" style="width:0%"></div>
+          </div>
           <span class="px-effort-count" id="px-ec-low">0</span>
         </div>
         <div class="px-effort-row">
           <span class="px-effort-label px-effort-medium">Med</span>
-          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-medium" id="px-ef-med" style="width:0%"></div></div>
+          <div class="px-effort-track">
+            <div class="px-effort-fill px-effort-fill-medium" id="px-ef-med" style="width:0%"></div>
+          </div>
           <span class="px-effort-count" id="px-ec-med">0</span>
         </div>
         <div class="px-effort-row">
           <span class="px-effort-label px-effort-high">High</span>
-          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-high" id="px-ef-high" style="width:0%"></div></div>
+          <div class="px-effort-track">
+            <div class="px-effort-fill px-effort-fill-high" id="px-ef-high" style="width:0%"></div>
+          </div>
           <span class="px-effort-count" id="px-ec-high">0</span>
         </div>
         <div class="px-effort-row">
           <span class="px-effort-label px-effort-max">Max</span>
-          <div class="px-effort-track"><div class="px-effort-fill px-effort-fill-max" id="px-ef-max" style="width:0%"></div></div>
+          <div class="px-effort-track">
+            <div class="px-effort-fill px-effort-fill-max" id="px-ef-max" style="width:0%"></div>
+          </div>
           <span class="px-effort-count" id="px-ec-max">0</span>
         </div>
       </div>
@@ -156,12 +180,24 @@
         <span id="px-effort-context-text"></span>
       </div>
 
+      <!-- Extended thinking toggle stats -->
+      <div class="px-extended-row" id="px-extended-row" style="display:none">
+        <span class="px-extended-label">Extended Thinking</span>
+        <div class="px-extended-badges">
+          <span class="px-extended-badge px-ext-on" title="Prompts with Extended Thinking ON">ON <strong
+              id="px-extc-on">0</strong></span>
+          <span class="px-extended-badge px-ext-off" title="Prompts with Extended Thinking OFF">OFF <strong
+              id="px-extc-off">0</strong></span>
+        </div>
+      </div>
+
       <!-- Daily stat cards (Feature 6) -->
       <div class="px-today-stats" id="px-today-stats">
         <div class="px-today-stat">
           <div class="px-today-stat-icon">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
             </svg>
           </div>
           <div class="px-today-stat-val" id="px-stat-msgs">—</div>
@@ -169,8 +205,10 @@
         </div>
         <div class="px-today-stat">
           <div class="px-today-stat-icon">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
             </svg>
           </div>
           <div class="px-today-stat-val" id="px-stat-time">—</div>
@@ -178,8 +216,10 @@
         </div>
         <div class="px-today-stat">
           <div class="px-today-stat-icon">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="m12 14 4-4" />
+              <path d="M3.34 19a10 10 0 1 1 17.32 0" />
             </svg>
           </div>
           <div class="px-today-stat-val" id="px-stat-tokens">—</div>
@@ -187,8 +227,11 @@
         </div>
         <div class="px-today-stat">
           <div class="px-today-stat-icon">
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10" />
+              <line x1="12" y1="20" x2="12" y2="4" />
+              <line x1="6" y1="20" x2="6" y2="14" />
             </svg>
           </div>
           <div class="px-today-stat-val" id="px-stat-avg">—</div>
@@ -202,11 +245,13 @@
       <div class="px-section-title">
         <span class="px-title-with-info">
           7-Day Token Trend
-          <span class="px-info-icon" data-tooltip="Estimated daily token usage (prompts + responses) over the last 7 days.">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="16" x2="12" y2="12"/>
-              <line x1="12" y1="8" x2="12.01" y2="8"/>
+          <span class="px-info-icon"
+            data-tooltip="Estimated daily token usage (prompts + responses) over the last 7 days.">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+              stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
             </svg>
           </span>
         </span>
@@ -225,17 +270,19 @@
       <div class="px-section-title">Data</div>
       <div class="px-tools-btns">
         <button class="px-tool-btn" id="px-btn-export">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
           Export JSON
         </button>
         <button class="px-tool-btn" id="px-btn-debug">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="4 17 10 11 4 5"/>
-            <line x1="12" y1="19" x2="20" y2="19"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="4 17 10 11 4 5" />
+            <line x1="12" y1="19" x2="20" y2="19" />
           </svg>
           Debug Logs
           <span class="px-badge" id="px-debug-badge">0</span>
@@ -243,18 +290,21 @@
       </div>
       <div class="px-tools-btns" style="margin-top:6px">
         <button class="px-tool-btn px-tool-btn-danger" id="px-btn-reset">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="23 4 23 10 17 10"/>
-            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
           </svg>
           Reset Stats
         </button>
         <button class="px-tool-btn px-tool-btn-danger" id="px-btn-clear-logs">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"/>
-            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
-            <path d="M10 11v6"/><path d="M14 11v6"/>
-            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6" />
+            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+            <path d="M10 11v6" />
+            <path d="M14 11v6" />
+            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
           </svg>
           Clear Logs
         </button>
@@ -270,14 +320,16 @@
             <span class="px-threshold-label">Session warning</span>
             <span class="px-threshold-val" id="px-thresh-session-val">80%</span>
           </div>
-          <input class="px-threshold-slider" id="px-thresh-session" type="range" min="50" max="95" step="5" value="80" aria-label="Session warning threshold">
+          <input class="px-threshold-slider" id="px-thresh-session" type="range" min="50" max="95" step="5" value="80"
+            aria-label="Session warning threshold">
         </div>
         <div class="px-threshold-row">
           <div class="px-threshold-top">
             <span class="px-threshold-label">Weekly warning</span>
             <span class="px-threshold-val" id="px-thresh-weekly-val">80%</span>
           </div>
-          <input class="px-threshold-slider" id="px-thresh-weekly" type="range" min="50" max="95" step="5" value="80" aria-label="Weekly warning threshold">
+          <input class="px-threshold-slider" id="px-thresh-weekly" type="range" min="50" max="95" step="5" value="80"
+            aria-label="Weekly warning threshold">
         </div>
       </div>
     </div>
@@ -370,9 +422,10 @@
     <!-- Intro banner -->
     <div class="px-guide-banner">
       <div class="px-guide-banner-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m12 14 4-4"/>
-          <path d="M3.34 19a10 10 0 1 1 17.32 0"/>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="m12 14 4-4" />
+          <path d="M3.34 19a10 10 0 1 1 17.32 0" />
         </svg>
         <span class="px-guide-banner-dot"></span>
       </div>
@@ -385,7 +438,12 @@
     <!-- ── Section: Dashboard ── -->
     <div class="px-guide-section">
       <div class="px-guide-section-hd">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+        </svg>
         Dashboard
       </div>
       <div class="px-guide-cards">
@@ -395,7 +453,8 @@
             <span class="px-guide-swatch" style="background:#cc9966"></span>
             <span class="px-guide-card-title">Session bar <span class="px-guide-badge">5h window</span></span>
           </div>
-          <p class="px-guide-card-body">Tracks how much of your rolling 5-hour token window you've used. Hover the bar to see raw token counts.</p>
+          <p class="px-guide-card-body">Tracks how much of your rolling 5-hour token window you've used. Hover the bar
+            to see raw token counts.</p>
         </div>
 
         <div class="px-guide-card">
@@ -403,7 +462,8 @@
             <span class="px-guide-swatch" style="background:#4ade80"></span>
             <span class="px-guide-card-title">Weekly bar <span class="px-guide-badge">7-day window</span></span>
           </div>
-          <p class="px-guide-card-body">Tracks usage across the 7-day token window. Resets on Claude's own rolling schedule.</p>
+          <p class="px-guide-card-body">Tracks usage across the 7-day token window. Resets on Claude's own rolling
+            schedule.</p>
         </div>
 
         <div class="px-guide-card">
@@ -462,25 +522,37 @@
     <!-- ── Section: Sidebar Panel ── -->
     <div class="px-guide-section">
       <div class="px-guide-section-hd">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <line x1="9" y1="3" x2="9" y2="21" />
+        </svg>
         Sidebar Panel
       </div>
       <div class="px-guide-cards">
 
         <div class="px-guide-card">
           <div class="px-guide-card-hd">
-            <svg class="px-guide-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <svg class="px-guide-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
             <span class="px-guide-card-title">Peak-hours clock</span>
           </div>
-          <p class="px-guide-card-body">24-hour timeline strip highlighting 6:30 PM – 12:30 AM IST — when Claude's shared infrastructure is busiest.</p>
+          <p class="px-guide-card-body">24-hour timeline strip highlighting 6:30 PM – 12:30 AM IST — when Claude's
+            shared infrastructure is busiest.</p>
         </div>
 
         <div class="px-guide-card">
           <div class="px-guide-card-hd">
-            <svg class="px-guide-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <svg class="px-guide-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
             <span class="px-guide-card-title">Messages remaining</span>
           </div>
-          <p class="px-guide-card-body">Estimated messages left in the current 5-hour window, based on your average token cost per message.</p>
+          <p class="px-guide-card-body">Estimated messages left in the current 5-hour window, based on your average
+            token cost per message.</p>
         </div>
 
       </div>
@@ -489,7 +561,11 @@
     <!-- ── Section: Settings ── -->
     <div class="px-guide-section">
       <div class="px-guide-section-hd">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3" />
+          <path
+            d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+        </svg>
         Settings <span class="px-guide-hint">(⚙ in sidebar)</span>
       </div>
       <div class="px-guide-settings-list">
@@ -511,7 +587,8 @@
         </div>
         <div class="px-guide-setting-row">
           <div class="px-guide-setting-name">Timezone</div>
-          <div class="px-guide-setting-desc">Override timezone for reset-time display (defaults to browser timezone).</div>
+          <div class="px-guide-setting-desc">Override timezone for reset-time display (defaults to browser timezone).
+          </div>
         </div>
         <div class="px-guide-setting-row">
           <div class="px-guide-setting-name">Debug logging</div>
@@ -523,7 +600,10 @@
     <!-- ── Section: Keyboard Shortcuts ── -->
     <div class="px-guide-section">
       <div class="px-guide-section-hd">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="6" width="20" height="13" rx="2" />
+          <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+        </svg>
         Keyboard Shortcuts
       </div>
       <div class="px-guide-shortcuts">
@@ -537,32 +617,50 @@
     <!-- ── Section: Token Estimates ── -->
     <div class="px-guide-section">
       <div class="px-guide-section-hd">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
         Token Estimates
       </div>
       <div class="px-guide-note">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span>Counts are <em>approximate</em> and labelled <strong>~est</strong>. Claude doesn't expose exact counts in the browser — input length is estimated from char count (÷ 4) and thinking tokens per effort level.</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+        <span>Counts are <em>approximate</em> and labelled <strong>~est</strong>. Claude doesn't expose exact counts in
+          the browser — input length is estimated from char count (÷ 4) and thinking tokens per effort level.</span>
       </div>
     </div>
 
     <!-- ── Section: Privacy ── -->
     <div class="px-guide-section">
       <div class="px-guide-section-hd">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
         Privacy
       </div>
       <div class="px-guide-privacy">
         <div class="px-guide-privacy-row">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
           <span>All data stored in <code>browser.storage.local</code> — on your device only</span>
         </div>
         <div class="px-guide-privacy-row">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
           <span>UsageX makes <strong>zero</strong> network calls of its own</span>
         </div>
         <div class="px-guide-privacy-row">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
           <span>No third-party libraries · no analytics · no telemetry</span>
         </div>
       </div>
@@ -572,4 +670,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>

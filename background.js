@@ -8,10 +8,10 @@ function todayStr() { return new Date().toISOString().slice(0, 10); }
 
 function freshToday() {
   return {
-    date:    todayStr(),
-    msgs:    0,
-    convos:  0,
-    time_s:  0,
+    date: todayStr(),
+    msgs: 0,
+    convos: 0,
+    time_s: 0,
     tokens_est: 0,
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
     processed_msg_uuids: [],
@@ -41,17 +41,17 @@ function defaultSettings() {
 }
 
 function scheduleMidnightAlarm() {
-  const now       = new Date();
-  const midnight  = new Date(now);
+  const now = new Date();
+  const midnight = new Date(now);
   midnight.setHours(24, 0, 10, 0);
-  const delayMs   = midnight.getTime() - now.getTime();
+  const delayMs = midnight.getTime() - now.getTime();
   const delayMins = delayMs / 60_000;
   browser.alarms.create('usagex-midnight', { delayInMinutes: delayMins });
 }
 
 async function handleMidnightReset() {
   const res = await browser.storage.local.get(['today', 'history', 'settings']);
-  const today   = res.today   || freshToday();
+  const today = res.today || freshToday();
   const history = res.history || [];
 
   if (today.date && today.date !== todayStr()) {
@@ -62,7 +62,7 @@ async function handleMidnightReset() {
   const newToday = freshToday();
 
   await browser.storage.local.set({
-    today:   newToday,
+    today: newToday,
     history: history,
   });
 
@@ -71,7 +71,7 @@ async function handleMidnightReset() {
 
 browser.runtime.onInstalled.addListener(async () => {
   const res = await browser.storage.local.get(['today', 'settings']);
-  if (!res.today)    await browser.storage.local.set({ today:    freshToday() });
+  if (!res.today) await browser.storage.local.set({ today: freshToday() });
   if (!res.settings) await browser.storage.local.set({ settings: defaultSettings() });
   scheduleMidnightAlarm();
 });
@@ -191,11 +191,11 @@ browser.storage.onChanged.addListener(async (changes, area) => {
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message && message.action === 'OPEN_HELP_POPUP') {
     const actionApi = typeof browser !== 'undefined' && browser.action ? browser.action : (typeof chrome !== 'undefined' ? chrome.action : null);
-    
+
     if (actionApi && typeof actionApi.openPopup === 'function') {
       const windowId = sender.tab ? sender.tab.windowId : undefined;
       const openPromise = windowId !== undefined ? actionApi.openPopup({ windowId }) : actionApi.openPopup();
-      
+
       if (openPromise && typeof openPromise.then === 'function') {
         openPromise
           .then(() => {

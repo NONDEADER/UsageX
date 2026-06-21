@@ -155,6 +155,7 @@ function freshToday() {
     time_s: 0,
     tokens_est: 0,
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
+    extended_thinking: { on: 0, off: 0 },
     last_model: null,
     processed_msg_uuids: [],
     recent_sent_prompts: []
@@ -346,7 +347,7 @@ windowMsgHandler = (event) => {
       await updateUI();
     })().catch(() => { });
   } else if (event.data.type === '__ux_convo_history') {
-    onConversationHistory(event.data.data, event.data.convoId || null, event.data.convoName || null).catch(() => { });
+    onConversationHistory(event.data.data, event.data.convoId || null, event.data.convoName || null, event.data.modelId || null, event.data.thinkingMode || null).catch(() => { });
   }
 };
 window.addEventListener('message', windowMsgHandler);
@@ -362,7 +363,7 @@ storageOnChangedHandler = (changes, area) => {
     if (oldVal.alert_weekly_threshold !== newVal.alert_weekly_threshold) {
       alertedFlags.weekly80 = false;
     }
-    updateUI().catch(() => {});
+    updateUI().catch(() => { });
   }
 };
 browser.storage.onChanged.addListener(storageOnChangedHandler);
@@ -414,14 +415,33 @@ async function onMessageSent(req) {
     if (recent.length > 20) recent.shift();
   }
 
+  const lastModelToUse = modelId || today.last_model || null;
+  const supportsEffortLevel = lastModelToUse ? modelSupportsEffortLevel(lastModelToUse) : false;
+  const supportsExtended = lastModelToUse ? modelSupportsExtendedToggle(lastModelToUse) : false;
   const effortKey = effort.toLowerCase();
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
-  eb[effortKey] = (eb[effortKey] || 0) + 1;
+  const et = today.extended_thinking || { on: 0, off: 0 };
+
+  // Count effort breakdown independently of thinking state.
+  // When thinking is off, effort is still set (e.g. "low") and should be tracked.
+  if (supportsEffortLevel) {
+    eb[effortKey] = (eb[effortKey] || 0) + 1;
+  }
+  if (supportsExtended) {
+    const isExtendedOn = parsedBody?.thinking_mode ? (parsedBody.thinking_mode !== 'off') : isThinking;
+    if (isExtendedOn) {
+      et.on = (et.on || 0) + 1;
+    } else {
+      et.off = (et.off || 0) + 1;
+    }
+  }
+
   await saveToday({
     msgs: today.msgs + 1,
     tokens_est: today.tokens_est + tokenDelta,
     effort_breakdown: eb,
-    last_model: modelId || today.last_model || null,
+    extended_thinking: et,
+    last_model: lastModelToUse,
     recent_sent_prompts: recent
   });
 
@@ -453,7 +473,7 @@ async function onMessageSent(req) {
   }, 2000);
 }
 
-async function onConversationHistory(chatMessages, convoId, convoName) {
+async function onConversationHistory(chatMessages, convoId, convoName, modelId, thinkingMode) {
   if (!Array.isArray(chatMessages)) return;
 
   const res = await browser.storage.local.get('today');
@@ -469,6 +489,7 @@ async function onConversationHistory(chatMessages, convoId, convoName) {
   let newMsgs = 0;
   let newTokenDelta = 0;
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
+  const et = today.extended_thinking || { on: 0, off: 0 };
 
   const isMessageToday = (dateStr) => {
     try {
@@ -481,6 +502,19 @@ async function onConversationHistory(chatMessages, convoId, convoName) {
       return false;
     }
   };
+
+  const activeModel = modelId || today.last_model || null;
+  const supportsEffortLevel = activeModel ? modelSupportsEffortLevel(activeModel) : false;
+  const supportsExtended = activeModel ? modelSupportsExtendedToggle(activeModel) : false;
+
+  let isExtendedOn = false;
+  if (supportsExtended) {
+    if (thinkingMode) {
+      isExtendedOn = (thinkingMode !== 'off');
+    } else {
+      isExtendedOn = chatMessages.some(m => m.sender === 'assistant' && Array.isArray(m.content) && m.content.some(b => b.type === 'thinking'));
+    }
+  }
 
   for (let i = 0; i < chatMessages.length; i++) {
     const msg = chatMessages[i];
@@ -532,8 +566,20 @@ async function onConversationHistory(chatMessages, convoId, convoName) {
       const thinkTokens = isThinking ? effortThinkTokens(effort) : 0;
       const tokenDelta = inputTokens + thinkTokens;
 
-      const effortKey = effort.toLowerCase();
-      eb[effortKey] = (eb[effortKey] || 0) + 1;
+      // Count effort breakdown independently of thinking state.
+      // When thinking is off, effort is still set (e.g. "low") and should be tracked.
+      if (supportsEffortLevel) {
+        const effortKey = effort.toLowerCase();
+        eb[effortKey] = (eb[effortKey] || 0) + 1;
+      }
+      if (supportsExtended) {
+        if (isExtendedOn) {
+          et.on = (et.on || 0) + 1;
+        } else {
+          et.off = (et.off || 0) + 1;
+        }
+      }
+
       newMsgs += 1;
       newTokenDelta += tokenDelta;
 
@@ -550,6 +596,8 @@ async function onConversationHistory(chatMessages, convoId, convoName) {
       msgs: today.msgs + newMsgs,
       tokens_est: today.tokens_est + newTokenDelta,
       effort_breakdown: eb,
+      extended_thinking: et,
+      last_model: activeModel,
       processed_msg_uuids: today.processed_msg_uuids,
       recent_sent_prompts: today.recent_sent_prompts
     });
@@ -586,26 +634,42 @@ function modelDisplayName(modelId) {
   const id = modelId.toLowerCase();
   if (id.includes('sonnet-4-6')) return 'Sonnet 4.6';
   if (id.includes('sonnet-4-5')) return 'Sonnet 4.5';
-  if (id.includes('opus-4-8'))   return 'Opus 4.8';
-  if (id.includes('opus-4-7'))   return 'Opus 4.7';
-  if (id.includes('opus-4-6'))   return 'Opus 4.6';
-  if (id.includes('opus-4-5'))   return 'Opus 4.5';
-  if (id.includes('fable'))      return 'Fable 5';
-  if (id.includes('mythos'))     return 'Mythos 5';
-  if (id.includes('haiku'))      return 'Haiku';
-  if (id.includes('sonnet'))     return 'Sonnet';
-  if (id.includes('opus'))       return 'Opus';
+  if (id.includes('opus-4-8')) return 'Opus 4.8';
+  if (id.includes('opus-4-7')) return 'Opus 4.7';
+  if (id.includes('opus-4-6')) return 'Opus 4.6';
+  if (id.includes('opus-4-5')) return 'Opus 4.5';
+  if (id.includes('fable')) return 'Fable 5';
+  if (id.includes('mythos')) return 'Mythos 5';
+  if (id.includes('haiku-4-5') || id.includes('haiku-4.5')) return 'Haiku 4.5';
+  if (id.includes('haiku')) return 'Haiku';
+  if (id.includes('sonnet')) return 'Sonnet';
+  if (id.includes('opus')) return 'Opus';
   return null;
 }
 
-function modelSupportsEffort(modelId) {
+function modelSupportsExtendedToggle(modelId) {
   if (!modelId) return false;
   const id = modelId.toLowerCase();
   return (
     id.includes('sonnet-4') || id.includes('opus-4') ||
     id.includes('fable') || id.includes('mythos') ||
+    id.includes('thinking') || id.includes('haiku-4-5') || id.includes('haiku-4.5')
+  );
+}
+
+function modelSupportsEffortLevel(modelId) {
+  if (!modelId) return false;
+  const id = modelId.toLowerCase();
+  if (id.includes('haiku-4-5') || id.includes('haiku-4.5')) return false;
+  return (
+    id.includes('sonnet-4') || id.includes('opus-4') ||
+    id.includes('fable') || id.includes('mythos') ||
     id.includes('thinking')
   );
+}
+
+function modelSupportsEffort(modelId) {
+  return modelSupportsExtendedToggle(modelId);
 }
 
 function detectEffort(parsedBody) {
@@ -618,38 +682,88 @@ function detectEffortAndThinking(parsedBody) {
 
   // ── 1. Read from request body (primary source) ──
   if (parsedBody) {
-    const thinkingType = parsedBody?.thinking?.type;
-    const isExplicitlyDisabled = thinkingType === 'disabled' || thinkingType === 'none';
+    const thinkingMode = parsedBody?.thinking_mode;
 
-    const effortStr =
-      parsedBody?.output_config?.effort ??
-      parsedBody?.thinking?.effort ??
-      parsedBody?.effort ??
-      null;
-
-    const budget =
-      parsedBody?.thinking?.budget_tokens ??
-      parsedBody?.thinking_budget ??
-      parsedBody?.metadata?.thinking_budget ??
-      null;
-
-    if (!isExplicitlyDisabled) {
+    if (thinkingMode === 'off') {
+      isThinking = false;
+      // Even with thinking off, the model may still have an effort_level set.
+      // Read it so the effort breakdown is recorded accurately.
+      const effortStr =
+        parsedBody?.output_config?.effort ??
+        parsedBody?.thinking?.effort ??
+        parsedBody?.effort ??
+        null;
       if (typeof effortStr === 'string') {
         const e = effortStr.toLowerCase();
-        isThinking = true;
+        if (e === 'max' || e === 'xhigh') effort = 'Max';
+        else if (e === 'high') effort = 'High';
+        else if (e === 'medium') effort = 'Medium';
+        else effort = 'Low';
+      }
+    } else if (thinkingMode === 'auto' || thinkingMode === 'extended') {
+      isThinking = true;
+
+      const effortStr =
+        parsedBody?.output_config?.effort ??
+        parsedBody?.thinking?.effort ??
+        parsedBody?.effort ??
+        null;
+
+      const budget =
+        parsedBody?.thinking?.budget_tokens ??
+        parsedBody?.thinking_budget ??
+        parsedBody?.metadata?.thinking_budget ??
+        null;
+
+      if (typeof effortStr === 'string') {
+        const e = effortStr.toLowerCase();
         if (e === 'max' || e === 'xhigh') effort = 'Max';
         else if (e === 'high') effort = 'High';
         else if (e === 'medium') effort = 'Medium';
         else effort = 'Low';
       } else if (budget != null && typeof budget === 'number' && budget > 0) {
-        isThinking = true;
         if (budget >= 16000) effort = 'Max';
         else if (budget >= 8000) effort = 'High';
         else if (budget >= 2000) effort = 'Medium';
         else effort = 'Low';
-      } else if (thinkingType === 'enabled' || thinkingType === 'adaptive') {
-        isThinking = true;
+      } else {
         effort = 'Low';
+      }
+    } else {
+      // Fallback for when thinking_mode is not present (standard/older API structure)
+      const thinkingType = parsedBody?.thinking?.type;
+      const isExplicitlyDisabled = thinkingType === 'disabled' || thinkingType === 'none';
+
+      const effortStr =
+        parsedBody?.output_config?.effort ??
+        parsedBody?.thinking?.effort ??
+        parsedBody?.effort ??
+        null;
+
+      const budget =
+        parsedBody?.thinking?.budget_tokens ??
+        parsedBody?.thinking_budget ??
+        parsedBody?.metadata?.thinking_budget ??
+        null;
+
+      if (!isExplicitlyDisabled) {
+        if (typeof effortStr === 'string') {
+          const e = effortStr.toLowerCase();
+          isThinking = true;
+          if (e === 'max' || e === 'xhigh') effort = 'Max';
+          else if (e === 'high') effort = 'High';
+          else if (e === 'medium') effort = 'Medium';
+          else effort = 'Low';
+        } else if (budget != null && typeof budget === 'number' && budget > 0) {
+          isThinking = true;
+          if (budget >= 16000) effort = 'Max';
+          else if (budget >= 8000) effort = 'High';
+          else if (budget >= 2000) effort = 'Medium';
+          else effort = 'Low';
+        } else if (thinkingType === 'enabled' || thinkingType === 'adaptive') {
+          isThinking = true;
+          effort = 'Low';
+        }
       }
     }
   }
@@ -1337,34 +1451,56 @@ async function updateUI() {
     }
   }
   // ── Effort pills ──
+  const lastModel = today.last_model || null;
+  const supportsEffortLevel = lastModel ? modelSupportsEffortLevel(lastModel) : false;
+  const supportsExtended = lastModel ? modelSupportsExtendedToggle(lastModel) : false;
+
   const effortSec = root.querySelector('#ux-effort-section');
   const effortModelBadge = root.querySelector('#ux-effort-model-badge');
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
-  const ebTotal = (eb.low || 0) + (eb.medium || 0) + (eb.high || 0) + (eb.max || 0);
+
   if (effortSec) {
-    effortSec.style.display = ebTotal > 0 ? '' : 'none';
+    effortSec.style.display = supportsExtended ? '' : 'none';
+    const pillsWrap = root.querySelector('.ux-effort-pills');
+    if (pillsWrap) {
+      pillsWrap.style.display = supportsEffortLevel ? '' : 'none';
+    }
     const epPairs = [
-      ['low',    '#ux-ep-low',  '#ux-epc-low'],
-      ['medium', '#ux-ep-med',  '#ux-epc-med'],
-      ['high',   '#ux-ep-high', '#ux-epc-high'],
-      ['max',    '#ux-ep-max',  '#ux-epc-max'],
+      ['low', '#ux-ep-low', '#ux-epc-low'],
+      ['medium', '#ux-ep-med', '#ux-epc-med'],
+      ['high', '#ux-ep-high', '#ux-epc-high'],
+      ['max', '#ux-ep-max', '#ux-epc-max'],
     ];
     for (const [key, pillSel, countSel] of epPairs) {
       const cnt = eb[key] || 0;
       const pillEl = root.querySelector(pillSel);
       const countEl = root.querySelector(countSel);
-      if (pillEl) pillEl.style.display = cnt > 0 ? '' : 'none';
+      if (pillEl) pillEl.style.display = (supportsEffortLevel && cnt > 0) ? '' : 'none';
       if (countEl) countEl.textContent = String(cnt);
     }
   }
+
   if (effortModelBadge) {
-    const lastModel = today.last_model || null;
     const dispName = modelDisplayName(lastModel);
     if (dispName) {
       effortModelBadge.textContent = dispName;
       effortModelBadge.style.display = '';
     } else {
       effortModelBadge.style.display = 'none';
+    }
+  }
+
+  const extendedRow = root.querySelector('#ux-extended-row');
+  if (extendedRow) {
+    if (supportsExtended) {
+      extendedRow.style.display = '';
+      const et = today.extended_thinking || { on: 0, off: 0 };
+      const etOnVal = root.querySelector('#ux-extc-on');
+      const etOffVal = root.querySelector('#ux-extc-off');
+      if (etOnVal) etOnVal.textContent = String(et.on || 0);
+      if (etOffVal) etOffVal.textContent = String(et.off || 0);
+    } else {
+      extendedRow.style.display = 'none';
     }
   }
 
@@ -1904,7 +2040,7 @@ function bindEvents() {
     try {
       // Signal to the popup that it should open on the Help tab
       await browser.storage.local.set({ _open_help_tab: true });
-      
+
       // Attempt to open the actual extension popup via background script
       const response = await new Promise((resolve) => {
         browser.runtime.sendMessage({ action: 'OPEN_HELP_POPUP' }, (res) => {
@@ -1927,7 +2063,7 @@ function bindEvents() {
       try {
         const popupUrl = browser.runtime.getURL('popup.html') + '?tab=help';
         browser.tabs.create({ url: popupUrl });
-      } catch (_) {}
+      } catch (_) { }
     }
   });
 
@@ -2170,6 +2306,11 @@ function getSidebarHTML() {
         <span class="ux-effort-pill ux-ep-med" id="ux-ep-med" data-tooltip="Medium effort messages today">Med <strong id="ux-epc-med">0</strong></span>
         <span class="ux-effort-pill ux-ep-high" id="ux-ep-high" data-tooltip="High effort messages today">High <strong id="ux-epc-high">0</strong></span>
         <span class="ux-effort-pill ux-ep-max" id="ux-ep-max" data-tooltip="Max effort messages today">Max <strong id="ux-epc-max">0</strong></span>
+      </div>
+      <div class="ux-extended-row" id="ux-extended-row" style="display:none">
+        <span class="ux-extended-label">Extended Thinking</span>
+        <span class="ux-extended-badge ux-ext-on" data-tooltip="Prompts with Extended Thinking ON">ON <strong id="ux-extc-on">0</strong></span>
+        <span class="ux-extended-badge ux-ext-off" data-tooltip="Prompts with Extended Thinking OFF">OFF <strong id="ux-extc-off">0</strong></span>
       </div>
     </div>
 
@@ -3621,6 +3762,45 @@ body.light .ux-toast-close:hover { color: #141413; }
   border: 1px solid rgba(204,153,102,0.2);
   letter-spacing: 0.03em;
   text-transform: uppercase;
+}
+.ux-extended-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--ux-border-subtle);
+}
+.ux-extended-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ux-text-3);
+  margin-right: auto;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.ux-extended-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 500;
+  padding: 1.5px 5px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+.ux-extended-badge strong {
+  font-weight: 700;
+}
+.ux-ext-on {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--ux-green-bright);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+.ux-ext-off {
+  background: rgba(100, 116, 139, 0.1);
+  color: var(--ux-text-3);
+  border-color: rgba(100, 116, 139, 0.2);
 }
   `;
 }

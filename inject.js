@@ -61,7 +61,9 @@
               const convoIdMatch = url.match(/\/chat_conversations\/([a-f0-9-]{36})/i);
               const convoId = convoIdMatch ? convoIdMatch[1] : null;
               const convoName = typeof json.name === 'string' ? json.name : null;
-              window.postMessage({ type: '__ux_convo_history', data: json.chat_messages, convoId, convoName }, '*');
+              const modelId = json.model?.id || json.model || json.model_id || null;
+              const thinkingMode = json.settings?.thinking_mode || json.effective_thinking_mode || null;
+              window.postMessage({ type: '__ux_convo_history', data: json.chat_messages, convoId, convoName, modelId, thinkingMode }, '*');
             }
 
             if (json.five_hour || json.seven_day) {

@@ -14,9 +14,54 @@ function freshToday() {
     time_s: 0,
     tokens_est: 0,
     effort_breakdown: { low: 0, medium: 0, high: 0, max: 0 },
+    extended_thinking: { on: 0, off: 0 },
+    last_model: null,
     processed_msg_uuids: [],
     recent_sent_prompts: []
   };
+}
+
+function modelDisplayName(modelId) {
+  if (!modelId) return null;
+  const id = modelId.toLowerCase();
+  if (id.includes('sonnet-4-6')) return 'Sonnet 4.6';
+  if (id.includes('sonnet-4-5')) return 'Sonnet 4.5';
+  if (id.includes('opus-4-8')) return 'Opus 4.8';
+  if (id.includes('opus-4-7')) return 'Opus 4.7';
+  if (id.includes('opus-4-6')) return 'Opus 4.6';
+  if (id.includes('opus-4-5')) return 'Opus 4.5';
+  if (id.includes('fable')) return 'Fable 5';
+  if (id.includes('mythos')) return 'Mythos 5';
+  if (id.includes('haiku-4-5') || id.includes('haiku-4.5')) return 'Haiku 4.5';
+  if (id.includes('haiku')) return 'Haiku';
+  if (id.includes('sonnet')) return 'Sonnet';
+  if (id.includes('opus')) return 'Opus';
+  return null;
+}
+
+function modelSupportsExtendedToggle(modelId) {
+  if (!modelId) return false;
+  const id = modelId.toLowerCase();
+  return (
+    id.includes('sonnet-4') || id.includes('opus-4') ||
+    id.includes('fable') || id.includes('mythos') ||
+    id.includes('thinking') || id.includes('haiku-4-5') || id.includes('haiku-4.5')
+  );
+}
+
+function modelSupportsEffortLevel(modelId) {
+  if (!modelId) return false;
+  const id = modelId.toLowerCase();
+  if (id.includes('haiku-4-5') || id.includes('haiku-4.5')) return false;
+  return (
+    id.includes('sonnet-4') || id.includes('opus-4') ||
+    id.includes('fable') || id.includes('mythos') ||
+    id.includes('thinking')
+  );
+}
+
+function modelSupportsEffort(modelId) {
+  return modelSupportsExtendedToggle(modelId);
 }
 
 function formatDuration(seconds) {
@@ -66,14 +111,14 @@ function getWeeklyTooltipText(weeklyPct) {
 }
 
 function getPeakStatus() {
-  const now  = new Date();
+  const now = new Date();
   const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
   const istMs = utcMs + 5.5 * 3600000;
-  const ist   = new Date(istMs);
-  const curH  = ist.getHours() + ist.getMinutes() / 60;
-  const day   = ist.getDay(); // 0 = Sun
+  const ist = new Date(istMs);
+  const curH = ist.getHours() + ist.getMinutes() / 60;
+  const day = ist.getDay(); // 0 = Sun
   const isWeekend = day === 0 || day === 6;
-  const inPeak    = !isWeekend && (curH >= 18.5 || curH < 0.5);
+  const inPeak = !isWeekend && (curH >= 18.5 || curH < 0.5);
   return { inPeak, isWeekend };
 }
 
@@ -84,7 +129,7 @@ function formatResetDisplay(timestamp) {
   const h = Math.floor(diff / 3600000);
   const m = Math.floor((diff % 3600000) / 60000);
   if (h >= 24) return `${Math.floor(h / 24)}d ${h % 24}h remaining`;
-  if (h === 0)  return `${m}m remaining`;
+  if (h === 0) return `${m}m remaining`;
   return `${h}h ${m}m remaining`;
 }
 
@@ -98,7 +143,7 @@ function calcUsageRateState(sessionPct, sessionResetsAt) {
   if (hoursElapsed <= 0) return pct > 0 ? 'extreme' : 'gray';
   const rate = pct / hoursElapsed;
   if (rate >= 30) return 'extreme';
-  if (rate > 21)  return 'up';
+  if (rate > 21) return 'up';
   if (rate >= 19) return 'neutral';
   return 'down';
 }
@@ -123,7 +168,7 @@ function showFeedback(elemId, msg) {
 // ─── Tab switching ───────────────────────────────────────────────────────────
 
 function initTabs() {
-  const tabs   = document.querySelectorAll('.px-tab');
+  const tabs = document.querySelectorAll('.px-tab');
   const panels = document.querySelectorAll('.px-panel');
 
   tabs.forEach(tab => {
@@ -142,10 +187,10 @@ function initTabs() {
 
 async function refreshDashboard() {
   const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs', 'history', 'settings']);
-  const today  = res.today         || freshToday();
-  const limits = res.usage_limits  || {};
-  const history = res.history      || [];
-  const settings = res.settings   || {};
+  const today = res.today || freshToday();
+  const limits = res.usage_limits || {};
+  const history = res.history || [];
+  const settings = res.settings || {};
 
   // ── Status banner + live dot ──
   const { inPeak, isWeekend } = getPeakStatus();
@@ -156,9 +201,9 @@ async function refreshDashboard() {
     if (tabs && tabs[0] && tabs[0].url) {
       if (tabs[0].url.includes('claude.ai')) onClaude = true;
     }
-  } catch (_) {}
+  } catch (_) { }
 
-  const bannerEl  = el('px-status-banner');
+  const bannerEl = el('px-status-banner');
   const statusTxt = el('px-status-text');
   if (bannerEl && statusTxt) {
     if (onClaude) {
@@ -197,7 +242,7 @@ async function refreshDashboard() {
 
   // ── Usage bars ──
   const sessionPct = limits.session_pct;
-  const weeklyPct  = limits.weekly_pct;
+  const weeklyPct = limits.weekly_pct;
 
   const sessionPctEl = el('px-session-pct');
   if (sessionPctEl) {
@@ -240,10 +285,10 @@ async function refreshDashboard() {
     rateDot.className = 'px-rate-dot rate-' + state;
     const labels = {
       extreme: 'Overuse ≥30%/h — burning fast!',
-      up:      'Above normal >21%/h',
+      up: 'Above normal >21%/h',
       neutral: 'On track ~20%/h',
-      down:    'Below normal <19%/h — good!',
-      gray:    'Calculating…',
+      down: 'Below normal <19%/h — good!',
+      gray: 'Calculating…',
     };
     rateDot.setAttribute('data-tooltip', labels[state] || 'Calculating…');
     rateDot.removeAttribute('title');
@@ -263,54 +308,105 @@ async function refreshDashboard() {
 
   // ── Feature 9: Pinned mini-stats strip ──
   const qsSession = el('px-qs-session');
-  const qsWeekly  = el('px-qs-weekly');
-  const qsMsgs    = el('px-qs-msgs');
+  const qsWeekly = el('px-qs-weekly');
+  const qsMsgs = el('px-qs-msgs');
   if (qsSession) {
     qsSession.textContent = fmtPct(sessionPct);
-    qsSession.style.color  = getThresholdColor(sessionPct) || 'var(--px-text-2)';
+    qsSession.style.color = getThresholdColor(sessionPct) || 'var(--px-text-2)';
   }
   if (qsWeekly) {
     qsWeekly.textContent = fmtPct(weeklyPct);
-    qsWeekly.style.color  = getThresholdColor(weeklyPct) || 'var(--px-text-2)';
+    qsWeekly.style.color = getThresholdColor(weeklyPct) || 'var(--px-text-2)';
   }
   if (qsMsgs) {
     qsMsgs.textContent = today.msgs != null ? String(today.msgs) : '0';
   }
 
   // ── Features 5 & 6: Today section — effort breakdown + daily meta ──
-  const eb      = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
+  const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
   const ebTotal = (eb.low || 0) + (eb.medium || 0) + (eb.high || 0) + (eb.max || 0);
   const maxCount = Math.max(eb.low || 0, eb.medium || 0, eb.high || 0, eb.max || 0, 1);
 
   const effortPairs = [
-    ['low',    'px-ef-low',  'px-ec-low'],
-    ['medium', 'px-ef-med',  'px-ec-med'],
-    ['high',   'px-ef-high', 'px-ec-high'],
-    ['max',    'px-ef-max',  'px-ec-max'],
+    ['low', 'px-ef-low', 'px-ec-low'],
+    ['medium', 'px-ef-med', 'px-ec-med'],
+    ['high', 'px-ef-high', 'px-ec-high'],
+    ['max', 'px-ef-max', 'px-ec-max'],
   ];
   for (const [key, fillId, countId] of effortPairs) {
-    const cnt  = eb[key] || 0;
+    const cnt = eb[key] || 0;
     const fill = el(fillId);
     const count = el(countId);
-    if (fill)  fill.style.width = Math.round((cnt / maxCount) * 100) + '%';
+    if (fill) fill.style.width = Math.round((cnt / maxCount) * 100) + '%';
     if (count) count.textContent = String(cnt);
   }
 
+  // Model Badge & Context note
+  const lastModel = today.last_model || null;
+  const displayName = modelDisplayName(lastModel);
+  const supportsEffortLevel = modelSupportsEffortLevel(lastModel);
+  const supportsExtended = modelSupportsExtendedToggle(lastModel);
+  const modelBadge = el('px-today-model-badge');
+  const effortContext = el('px-effort-context');
+  const effortContextText = el('px-effort-context-text');
+  const effortList = el('px-effort-list');
+
+  if (modelBadge) {
+    if (displayName) {
+      modelBadge.textContent = displayName;
+      modelBadge.style.display = '';
+    } else {
+      modelBadge.style.display = 'none';
+    }
+  }
+
+  if (effortList) {
+    effortList.style.display = supportsEffortLevel ? '' : 'none';
+  }
+
+  if (effortContext && effortContextText) {
+    if (lastModel && !supportsEffortLevel) {
+      effortContextText.textContent = "Effort levels not applicable for this model";
+      effortContextText.style.fontStyle = "italic";
+      effortContext.style.display = '';
+    } else if (lastModel && supportsEffortLevel) {
+      effortContextText.textContent = "Effort breakdown reflects thinking tokens used";
+      effortContextText.style.fontStyle = "normal";
+      effortContext.style.display = '';
+    } else {
+      effortContext.style.display = 'none';
+    }
+  }
+
+  const extendedRow = el('px-extended-row');
+  if (extendedRow) {
+    if (lastModel && supportsExtended) {
+      extendedRow.style.display = '';
+      const et = today.extended_thinking || { on: 0, off: 0 };
+      const etOn = el('px-extc-on');
+      const etOff = el('px-extc-off');
+      if (etOn) etOn.textContent = String(et.on || 0);
+      if (etOff) etOff.textContent = String(et.off || 0);
+    } else {
+      extendedRow.style.display = 'none';
+    }
+  }
+
   // Feature 6: stat cards
-  const msgs      = today.msgs || 0;
+  const msgs = today.msgs || 0;
   const tokensEst = today.tokens_est || 0;
-  const avgTok    = msgs > 0 ? Math.round(tokensEst / msgs) : null;
-  const timeStr   = formatDuration(today.time_s);
+  const avgTok = msgs > 0 ? Math.round(tokensEst / msgs) : null;
+  const timeStr = formatDuration(today.time_s);
 
-  const statMsgs   = el('px-stat-msgs');
-  const statTime   = el('px-stat-time');
+  const statMsgs = el('px-stat-msgs');
+  const statTime = el('px-stat-time');
   const statTokens = el('px-stat-tokens');
-  const statAvg    = el('px-stat-avg');
+  const statAvg = el('px-stat-avg');
 
-  if (statMsgs)   statMsgs.textContent   = String(msgs);
-  if (statTime)   statTime.textContent   = timeStr || '0m';
+  if (statMsgs) statMsgs.textContent = String(msgs);
+  if (statTime) statTime.textContent = timeStr || '0m';
   if (statTokens) statTokens.textContent = `~${formatTokens(tokensEst)}`;
-  if (statAvg)    statAvg.textContent    = avgTok !== null ? `~${formatTokens(avgTok)}` : '—';
+  if (statAvg) statAvg.textContent = avgTok !== null ? `~${formatTokens(avgTok)}` : '—';
 
   // Hide Today section only when there are zero messages AND no limits data yet
   const todaySec = el('px-today-section');
@@ -324,8 +420,8 @@ async function refreshDashboard() {
   // ── Feature 10: sync threshold sliders from settings ──
   const sessSlider = el('px-thresh-session');
   const weekSlider = el('px-thresh-weekly');
-  const sessVal    = el('px-thresh-session-val');
-  const weekVal    = el('px-thresh-weekly-val');
+  const sessVal = el('px-thresh-session-val');
+  const weekVal = el('px-thresh-weekly-val');
   if (sessSlider && settings.alert_session_threshold != null) {
     sessSlider.value = settings.alert_session_threshold;
     if (sessVal) sessVal.textContent = settings.alert_session_threshold + '%';
@@ -339,9 +435,9 @@ async function refreshDashboard() {
 // ─── Sparkline (Feature 1) ───────────────────────────────────────────────────
 
 function renderSparkline(history, today) {
-  const chartEl  = el('px-chart');
+  const chartEl = el('px-chart');
   const labelsEl = el('px-chart-labels');
-  const section  = el('px-chart-section');
+  const section = el('px-chart-section');
   if (!chartEl) return;
 
   // Build last 7 data points: history days + today
@@ -381,7 +477,7 @@ function renderSparkline(history, today) {
   }
 
   // Area fill path
-  const areaD = d + ` L ${pts[pts.length-1][0]},${H} L ${pts[0][0]},${H} Z`;
+  const areaD = d + ` L ${pts[pts.length - 1][0]},${H} L ${pts[0][0]},${H} Z`;
 
   chartEl.innerHTML = `
     <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true" style="overflow: visible;">
@@ -421,7 +517,7 @@ function renderSparkline(history, today) {
 
   // Day labels: Mon/Tue/…
   if (labelsEl) {
-    const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     labelsEl.innerHTML = allDays.map(d => {
       if (!d.date) return '<span></span>';
       const day = new Date(d.date + 'T12:00:00').getDay();
@@ -515,8 +611,8 @@ function renderSparkline(history, today) {
 
 async function initHistory() {
   const res = await browser.storage.local.get(['history', 'today', 'conv_stats']);
-  const history   = res.history    || [];
-  const today     = res.today      || freshToday();
+  const history = res.history || [];
+  const today = res.today || freshToday();
   const convStats = res.conv_stats || {};
 
   const allDays = [...history, today].filter(Boolean);
@@ -570,10 +666,10 @@ function renderHeatmap(days) {
 
     let level = 0;
     if (!isFuture && tok > 0) {
-      if (ratio > 0.75)      level = 4;
-      else if (ratio > 0.5)  level = 3;
+      if (ratio > 0.75) level = 4;
+      else if (ratio > 0.5) level = 3;
       else if (ratio > 0.25) level = 2;
-      else                   level = 1;
+      else level = 1;
     }
 
     let label = '';
@@ -614,7 +710,7 @@ function renderTopConversations(convStats) {
   listEl.innerHTML = entries.map((c, i) => {
     const name = c.name || `Conversation ${i + 1}`;
     const barW = Math.round(((c.tokens_est || 0) / topTokens) * 100);
-    const ts   = c.last_active ? new Date(c.last_active).toLocaleDateString() : '';
+    const ts = c.last_active ? new Date(c.last_active).toLocaleDateString() : '';
     return `
       <div class="px-convo-row">
         <div class="px-convo-header">
@@ -646,11 +742,11 @@ function renderDailyLog(historyDesc) {
 // ─── Tools ───────────────────────────────────────────────────────────────────
 
 async function exportData() {
-  const res  = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits', 'debug_logs']);
+  const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits', 'debug_logs']);
   const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
   a.download = `usagex-export-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(url);
@@ -704,7 +800,7 @@ function initTools() {
 
   async function saveThresholds() {
     const res = await browser.storage.local.get('settings');
-    const s   = res.settings || {};
+    const s = res.settings || {};
     const sessV = Number(sessSlider?.value ?? 80);
     const weekV = Number(weekSlider?.value ?? 80);
     await browser.storage.local.set({ settings: { ...s, alert_session_threshold: sessV, alert_weekly_threshold: weekV } });
@@ -758,7 +854,7 @@ async function init() {
   const histTab = el('tab-history');
   if (histTab) {
     histTab.addEventListener('click', () => {
-      initHistory().catch(() => {});
+      initHistory().catch(() => { });
     }, { once: true });
   }
 
