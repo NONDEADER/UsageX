@@ -77,7 +77,7 @@ browser.storage.onChanged.addListener(async (changes, area) => {
   if (area !== 'local') return;
 
   // Mirror live keys to namespaced keys of the active account
-  const liveKeys = ['today', 'usage_limits', 'conv_stats'];
+  const liveKeys = ['today', 'usage_limits', 'conv_stats', 'user_email', 'user_name'];
   const keysToMirror = {};
   let hasMirrorChange = false;
 

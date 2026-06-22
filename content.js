@@ -117,24 +117,28 @@ async function loadToday() {
     console.error('[UsageX] Migration failed:', err);
   }
   const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits']);
-  const todayDate = todayStr();
+  const settings = res.settings || defaultSettings();
+  const ianaTz = getIANATimezone(settings.timezone);
+  const todayDate = todayStr(ianaTz);
   // If date has changed, archive yesterday into IndexedDB and reset today in storage.local
   if (!res.today || res.today.date !== todayDate) {
     if (res.today && res.today.date) {
       // Archive yesterday to IndexedDB
       try { await UsageXDB.saveDailyStats(res.today.date, res.today); } catch (_) {}
     }
-    const fresh = freshToday();
+    const fresh = freshToday(ianaTz);
     await browser.storage.local.set({ today: fresh });
-    return { today: fresh, settings: res.settings || defaultSettings(), usage_limits: res.usage_limits };
+    return { today: fresh, settings: settings, usage_limits: res.usage_limits };
   }
-  return { today: res.today, settings: res.settings || defaultSettings(), usage_limits: res.usage_limits };
+  return { today: res.today, settings: settings, usage_limits: res.usage_limits };
 }
 
 async function saveToday(patch) {
-  const res = await browser.storage.local.get('today');
-  const today = res.today || freshToday();
-  const updated = { ...today, ...patch, date: todayStr() };
+  const res = await browser.storage.local.get(['today', 'settings']);
+  const settings = res.settings || defaultSettings();
+  const ianaTz = getIANATimezone(settings.timezone);
+  const today = res.today || freshToday(ianaTz);
+  const updated = { ...today, ...patch, date: todayStr(ianaTz) };
   await browser.storage.local.set({ today: updated });
   return updated;
 }
@@ -151,9 +155,9 @@ async function saveSettings(patch) {
   return s;
 }
 
-function freshToday() {
+function freshToday(ianaTz) {
   return {
-    date: todayStr(),
+    date: todayStr(ianaTz),
     msgs: 0,
     convos: 0,
     time_s: 0,
@@ -192,7 +196,24 @@ function defaultSettings() {
     alert_weekly_threshold: 80
   };
 }
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr(ianaTz) {
+  try {
+    const tz = ianaTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
 
 function setupSidebarResizeObserver(root) {
   if (sidebarResizeObserver) {
@@ -352,11 +373,14 @@ async function switchAccount(oldAccountId, newAccountId) {
   
   // 1. Save current live stats to the old account's namespace
   if (oldAccountId) {
-    const liveData = await storage.local.get(['today', 'usage_limits', 'conv_stats']);
+    const liveData = await storage.local.get(['today', 'usage_limits', 'conv_stats', 'user_email', 'user_name', 'user_plan']);
     const archive = {};
     if (liveData.today) archive[`today_${oldAccountId}`] = liveData.today;
     if (liveData.usage_limits) archive[`usage_limits_${oldAccountId}`] = liveData.usage_limits;
     if (liveData.conv_stats) archive[`conv_stats_${oldAccountId}`] = liveData.conv_stats;
+    if (liveData.user_email) archive[`user_email_${oldAccountId}`] = liveData.user_email;
+    if (liveData.user_name) archive[`user_name_${oldAccountId}`] = liveData.user_name;
+    if (liveData.user_plan) archive[`user_plan_${oldAccountId}`] = liveData.user_plan;
     await storage.local.set(archive);
   }
 
@@ -364,14 +388,24 @@ async function switchAccount(oldAccountId, newAccountId) {
   const newData = await storage.local.get([
     `today_${newAccountId}`,
     `usage_limits_${newAccountId}`,
-    `conv_stats_${newAccountId}`
+    `conv_stats_${newAccountId}`,
+    `user_email_${newAccountId}`,
+    `user_name_${newAccountId}`,
+    `user_plan_${newAccountId}`,
+    'settings'
   ]);
+
+  const settings = newData.settings || defaultSettings();
+  const ianaTz = getIANATimezone(settings.timezone);
 
   const updates = {
     active_account_id: newAccountId,
-    today: newData[`today_${newAccountId}`] || freshToday(),
+    today: newData[`today_${newAccountId}`] || freshToday(ianaTz),
     usage_limits: newData[`usage_limits_${newAccountId}`] || {},
-    conv_stats: newData[`conv_stats_${newAccountId}`] || {}
+    conv_stats: newData[`conv_stats_${newAccountId}`] || {},
+    user_email: newData[`user_email_${newAccountId}`] || '',
+    user_name: newData[`user_name_${newAccountId}`] || '',
+    user_plan: newData[`user_plan_${newAccountId}`] || ''
   };
 
   await storage.local.set(updates);
@@ -381,12 +415,12 @@ async function switchAccount(oldAccountId, newAccountId) {
   }
 }
 
-async function handleUserInfo(uuid, email) {
+async function handleUserInfo(uuid, email, name) {
   const accountId = sanitizeAccountId(uuid || email);
   if (!accountId) return;
 
   const storage = typeof browser !== "undefined" ? browser.storage : chrome.storage;
-  const res = await storage.local.get(['active_account_id', 'first_account_id']);
+  const res = await storage.local.get(['active_account_id', 'first_account_id', 'user_email', 'user_name']);
   const currentActive = res.active_account_id;
   let firstAccount = res.first_account_id;
 
@@ -396,14 +430,33 @@ async function handleUserInfo(uuid, email) {
   }
 
   if (currentActive === accountId) {
+    const updates = {};
+    if (email && res.user_email !== email) updates.user_email = email;
+    if (name && res.user_name !== name) updates.user_name = name;
+    if (Object.keys(updates).length > 0) {
+      await storage.local.set(updates);
+      if (typeof updateUI === 'function') {
+        await updateUI();
+      }
+    }
     return;
   }
 
   console.log('[UsageX] Account switch detected from', currentActive, 'to', accountId);
 
+  if (email || name) {
+    const targetArchive = {};
+    if (email) targetArchive[`user_email_${accountId}`] = email;
+    if (name) targetArchive[`user_name_${accountId}`] = name;
+    await storage.local.set(targetArchive);
+  }
+
   if (!currentActive) {
     if (accountId === firstAccount) {
-      await storage.local.set({ active_account_id: accountId });
+      const updates = { active_account_id: accountId };
+      if (email) updates.user_email = email;
+      if (name) updates.user_name = name;
+      await storage.local.set(updates);
       if (typeof updateUI === 'function') {
         await updateUI();
       }
@@ -429,7 +482,30 @@ windowMsgHandler = (event) => {
   } else if (event.data.type === '__ux_convo_history') {
     onConversationHistory(event.data.data, event.data.convoId || null, event.data.convoName || null, event.data.modelId || null, event.data.thinkingMode || null).catch(() => { });
   } else if (event.data.type === '__ux_user_info') {
-    handleUserInfo(event.data.uuid, event.data.email).catch(() => { });
+    (async () => {
+      const email = event.data.email;
+      const name = event.data.name;
+      const plan = event.data.plan;
+      if (!email && !name && !plan) return;
+      const storage = typeof browser !== "undefined" ? browser.storage : chrome.storage;
+      const res = await storage.local.get(['active_account_id', 'user_email', 'user_name', 'user_plan']);
+      const currentActive = res.active_account_id;
+      const updates = {};
+      if (email && res.user_email !== email) updates.user_email = email;
+      if (name && res.user_name !== name) updates.user_name = name;
+      if (plan && res.user_plan !== plan) updates.user_plan = plan;
+      if (currentActive) {
+        if (email) updates[`user_email_${currentActive}`] = email;
+        if (name) updates[`user_name_${currentActive}`] = name;
+        if (plan) updates[`user_plan_${currentActive}`] = plan;
+      }
+      if (Object.keys(updates).length > 0) {
+        await storage.local.set(updates);
+        if (typeof updateUI === 'function') {
+          await updateUI();
+        }
+      }
+    })().catch(() => { });
   }
 };
 window.addEventListener('message', windowMsgHandler);
@@ -497,8 +573,7 @@ async function onMessageSent(req) {
   const inputTokens = Math.round(inputChars / 4);
   const thinkTokens = isThinking ? effortThinkTokens(effort) : 0;
   const tokenDelta = inputTokens + thinkTokens;
-  const res = await browser.storage.local.get('today');
-  const today = res.today || freshToday();
+  const { today } = await loadToday();
 
   // Record fingerprint to avoid double counting when history is loaded
   const fingerprint = getPromptFingerprint(promptText);
@@ -572,8 +647,7 @@ async function onMessageSent(req) {
 async function onConversationHistory(chatMessages, convoId, convoName, modelId, thinkingMode) {
   if (!Array.isArray(chatMessages)) return;
 
-  const res = await browser.storage.local.get('today');
-  const today = res.today || freshToday();
+  const { today } = await loadToday();
   if (!today.processed_msg_uuids) {
     today.processed_msg_uuids = [];
   }
@@ -590,11 +664,10 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
 
   const isMessageToday = (dateStr) => {
     try {
-      const date = new Date(dateStr);
-      const todayDate = new Date();
-      return date.getFullYear() === todayDate.getFullYear() &&
-        date.getMonth() === todayDate.getMonth() &&
-        date.getDate() === todayDate.getDate();
+      // Compare the message date string against the stored today.date
+      // today.date is already computed with the correct timezone in loadToday()
+      const msgDateOnly = dateStr ? dateStr.slice(0, 10) : '';
+      return msgDateOnly === today.date;
     } catch (_) {
       return false;
     }
@@ -922,8 +995,7 @@ function checkUrlChange() {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     if (location.pathname.startsWith('/chat/')) {
-      browser.storage.local.get('today').then(res => {
-        const today = res.today || freshToday();
+      loadToday().then(({ today }) => {
         saveToday({ convos: today.convos + 1 });
       }).catch(() => { });
       debugLog('new_convo', { url: location.href });
@@ -937,8 +1009,7 @@ function checkUrlChange() {
 function startTimeTracking() {
   timeTrackingInterval = setInterval(() => {
     if (!isIdle) {
-      browser.storage.local.get('today').then(res => {
-        const today = res.today || freshToday();
+      loadToday().then(({ today }) => {
         saveToday({ time_s: today.time_s + 10 }).catch(() => { });
       }).catch(() => { });
     }
@@ -2159,7 +2230,10 @@ function bindEvents() {
   });
 
   root.querySelector('#ux-btn-reset')?.addEventListener('click', async () => {
-    await browser.storage.local.set({ today: freshToday() });
+    const res = await browser.storage.local.get('settings');
+    const settings = res.settings || defaultSettings();
+    const ianaTz = getIANATimezone(settings.timezone);
+    await browser.storage.local.set({ today: freshToday(ianaTz) });
     await UsageXDB.clearAllStats().catch(() => {});
     await updateUI();
   });
@@ -4023,6 +4097,55 @@ async function fetchUsageLimitsActive() {
     // Use the org UUID as the account identifier — proven to work, unlike /api/me (404)
     await handleUserInfo(orgId, orgName);
 
+    // Fetch /api/account to get the real user name + email.
+    // Claude's API uses /api/account (not /api/me which returns 404).
+    // Field names confirmed from Claude's response: email_address, full_name, display_name, uuid.
+    try {
+      const accountRes = await fetch(window.location.origin + '/api/account');
+      if (accountRes.ok) {
+        const accountJson = await accountRes.json();
+        if (accountJson) {
+          // /api/account returns the user object directly
+          const userName = accountJson.full_name || accountJson.display_name || accountJson.name || '';
+          const userEmail = accountJson.email_address || accountJson.email || '';
+          
+          let userPlan = '';
+          const memberships = Array.isArray(accountJson.memberships) ? accountJson.memberships : [];
+          const activeMember = memberships.find(m => {
+            const caps = m?.organization?.capabilities || [];
+            return caps.includes("chat") || caps.includes("claude_pro") || caps.includes("claude_max");
+          }) || memberships.find(m => !(m?.organization?.capabilities || []).includes("api")) || memberships[0];
+          
+          if (activeMember?.organization) {
+            const tier = String(activeMember.organization.rate_limit_tier || '').toLowerCase();
+            const caps = activeMember.organization.capabilities || [];
+            if (tier.includes('max_20x')) userPlan = 'Max x20';
+            else if (tier.includes('max_5x') || tier.includes('max5')) userPlan = 'Max x5';
+            else if (tier.includes('pro')) userPlan = 'Pro';
+            else if (tier.includes('free')) userPlan = 'Free';
+            else if (caps.includes('claude_max')) userPlan = 'Max';
+            else if (caps.includes('claude_pro')) userPlan = 'Pro';
+          }
+
+          if (userEmail || userName || userPlan) {
+            const res = await browser.storage.local.get(['user_email', 'user_name', 'user_plan']);
+            const updates = {};
+            if (userEmail && res.user_email !== userEmail) updates.user_email = userEmail;
+            if (userName && res.user_name !== userName) updates.user_name = userName;
+            if (userPlan && res.user_plan !== userPlan) updates.user_plan = userPlan;
+            if (orgId) {
+              if (userEmail) updates[`user_email_${orgId}`] = userEmail;
+              if (userName) updates[`user_name_${orgId}`] = userName;
+              if (userPlan) updates[`user_plan_${orgId}`] = userPlan;
+            }
+            if (Object.keys(updates).length > 0) {
+              await browser.storage.local.set(updates);
+            }
+          }
+        }
+      }
+    } catch (_) { /* /api/account is optional — don't fail the main flow */ }
+
     const usageRes = await fetch(window.location.origin + `/api/organizations/${orgId}/usage`);
     if (!usageRes.ok) {
       await debugLog('active_fetch_failed', { status: usageRes.status, stage: 'usage', orgId });
@@ -4062,6 +4185,12 @@ async function init() {
 
   // fetchUsageLimitsActive handles both account detection and usage limits
   await fetchUsageLimitsActive().catch(() => { });
+
+  // Ask inject.js to replay cached user info (if /api/me was already intercepted)
+  // or fall back to DOM scraping. Small delay lets the inject script fully load first.
+  setTimeout(() => {
+    window.postMessage({ type: '__ux_request_user_info' }, '*');
+  }, 800);
 
   let attempts = 0;
   tryInjectInterval = setInterval(async () => {

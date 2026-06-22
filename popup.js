@@ -4,11 +4,28 @@ if (typeof browser === 'undefined') var browser = chrome;
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr(ianaTz) {
+  try {
+    const tz = ianaTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+    const parts = formatter.formatToParts(new Date());
+    const year = parts.find(p => p.type === 'year').value;
+    const month = parts.find(p => p.type === 'month').value;
+    const day = parts.find(p => p.type === 'day').value;
+    return `${year}-${month}-${day}`;
+  } catch (e) {
+    return new Date().toISOString().slice(0, 10);
+  }
+}
 
-function freshToday() {
+function freshToday(ianaTz) {
   return {
-    date: todayStr(),
+    date: todayStr(ianaTz),
     msgs: 0,
     convos: 0,
     time_s: 0,
@@ -197,11 +214,56 @@ function initTabs() {
 
 async function refreshDashboard() {
   // today is live — shared via chrome.storage.local between content.js and popup.js
-  const todayDate = todayStr();
-  const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs', 'settings']);
-  const today = res.today || freshToday();
-  const limits = res.usage_limits || {};
+  const res = await browser.storage.local.get(['today', 'usage_limits', 'debug_logs', 'settings', 'user_name', 'user_email', 'user_plan']);
   const settings = res.settings || {};
+  const ianaTz = (() => {
+    try {
+      if (!settings.timezone || settings.timezone === 'auto') return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const TZ_MAP = { 'HST':'Pacific/Honolulu','AKST':'America/Anchorage','PST':'America/Los_Angeles','MST':'America/Denver','CST':'America/Chicago','EST':'America/New_York','AST':'America/Halifax','BRT':'America/Sao_Paulo','GMT':'Etc/GMT','CET':'Europe/Paris','EET':'Europe/Athens','MSK':'Europe/Moscow','GST':'Asia/Dubai','PKT':'Asia/Karachi','IST':'Asia/Kolkata','NPT':'Asia/Kathmandu','BST':'Asia/Dhaka','ICT':'Asia/Bangkok','CST-Asia':'Asia/Shanghai','SGT':'Asia/Singapore','JST':'Asia/Tokyo','KST':'Asia/Seoul','ACST':'Australia/Darwin','AEST':'Australia/Sydney','NZST':'Pacific/Auckland' };
+      return TZ_MAP[settings.timezone] || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch(e) { return Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  })();
+  const todayDate = todayStr(ianaTz);
+  const today = res.today || freshToday(ianaTz);
+  const limits = res.usage_limits || {};
+
+  // ── Account Card ──
+  const userName = res.user_name || '';
+  const userEmail = res.user_email || '';
+  const userPlan = res.user_plan || '';
+  const accountCard = el('px-account-card');
+  const accountAvatar = el('px-account-avatar');
+  const accountName = el('px-account-name');
+  const accountEmail = el('px-account-email');
+  const accountPlan = el('px-account-plan');
+  if (accountCard) {
+    if (userName || userEmail) {
+      accountCard.style.display = 'flex';
+      const initial = (userName || userEmail).trim()[0] || '?';
+      if (accountAvatar) accountAvatar.textContent = initial.toUpperCase();
+      if (accountName) accountName.textContent = userName || '—';
+      if (accountEmail) accountEmail.textContent = userEmail || '—';
+      if (accountPlan) {
+        if (userPlan) {
+          accountPlan.textContent = userPlan;
+          accountPlan.className = 'px-plan-pill';
+          const pLower = userPlan.toLowerCase();
+          if (pLower.includes('pro')) {
+            accountPlan.classList.add('px-plan-pill-pro');
+          } else if (pLower.includes('max')) {
+            accountPlan.classList.add('px-plan-pill-max');
+          } else {
+            accountPlan.classList.add('px-plan-pill-free');
+          }
+          accountPlan.style.display = 'inline-flex';
+        } else {
+          accountPlan.style.display = 'none';
+        }
+      }
+    } else {
+      accountCard.style.display = 'none';
+    }
+  }
 
   // history is archived — stored in IndexedDB (extension origin, accessible by popup)
   const allHistory = await UsageXDB.getAllDailyStats();
@@ -641,9 +703,17 @@ function renderSparkline(history, today) {
 
 async function initHistory() {
   // today is live from storage.local; past days come from IndexedDB
-  const todayDate = todayStr();
-  const resLocal = await browser.storage.local.get(['today', 'conv_stats']);
-  const today = resLocal.today || freshToday();
+  const resLocal = await browser.storage.local.get(['today', 'conv_stats', 'settings']);
+  const settings = resLocal.settings || {};
+  const ianaTz = (() => {
+    try {
+      if (!settings.timezone || settings.timezone === 'auto') return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const TZ_MAP = { 'HST':'Pacific/Honolulu','AKST':'America/Anchorage','PST':'America/Los_Angeles','MST':'America/Denver','CST':'America/Chicago','EST':'America/New_York','AST':'America/Halifax','BRT':'America/Sao_Paulo','GMT':'Etc/GMT','CET':'Europe/Paris','EET':'Europe/Athens','MSK':'Europe/Moscow','GST':'Asia/Dubai','PKT':'Asia/Karachi','IST':'Asia/Kolkata','NPT':'Asia/Kathmandu','BST':'Asia/Dhaka','ICT':'Asia/Bangkok','CST-Asia':'Asia/Shanghai','SGT':'Asia/Singapore','JST':'Asia/Tokyo','KST':'Asia/Seoul','ACST':'Australia/Darwin','AEST':'Australia/Sydney','NZST':'Pacific/Auckland' };
+      return TZ_MAP[settings.timezone] || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch(e) { return Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  })();
+  const todayDate = todayStr(ianaTz);
+  const today = resLocal.today || freshToday(ianaTz);
   const allHistory = await UsageXDB.getAllDailyStats();
   const topConvos = await UsageXDB.getTopConversations(5);
 
@@ -851,8 +921,17 @@ async function openDebugViewer() {
 }
 
 async function resetTodayStats() {
-  await browser.storage.local.set({ today: freshToday() });
-  await UsageXDB.saveDailyStats(todayStr(), freshToday()).catch(() => {});
+  const res = await browser.storage.local.get('settings');
+  const settings = res.settings || {};
+  const ianaTz = (() => {
+    try {
+      if (!settings.timezone || settings.timezone === 'auto') return Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const TZ_MAP = { 'HST':'Pacific/Honolulu','AKST':'America/Anchorage','PST':'America/Los_Angeles','MST':'America/Denver','CST':'America/Chicago','EST':'America/New_York','AST':'America/Halifax','BRT':'America/Sao_Paulo','GMT':'Etc/GMT','CET':'Europe/Paris','EET':'Europe/Athens','MSK':'Europe/Moscow','GST':'Asia/Dubai','PKT':'Asia/Karachi','IST':'Asia/Kolkata','NPT':'Asia/Kathmandu','BST':'Asia/Dhaka','ICT':'Asia/Bangkok','CST-Asia':'Asia/Shanghai','SGT':'Asia/Singapore','JST':'Asia/Tokyo','KST':'Asia/Seoul','ACST':'Australia/Darwin','AEST':'Australia/Sydney','NZST':'Pacific/Auckland' };
+      return TZ_MAP[settings.timezone] || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch(e) { return Intl.DateTimeFormat().resolvedOptions().timeZone; }
+  })();
+  await browser.storage.local.set({ today: freshToday(ianaTz) });
+  await UsageXDB.saveDailyStats(todayStr(ianaTz), freshToday(ianaTz)).catch(() => {});
   await refreshDashboard();
   showFeedback('px-action-feedback', '✓ Daily counters reset');
 }
@@ -943,10 +1022,9 @@ async function init() {
   initOpenClaude();
   await refreshDashboard();
 
-  // Listen for storage changes to refresh dashboard/history live
   browser.storage.onChanged.addListener((changes, area) => {
     if (area !== 'local') return;
-    if (changes.today || changes.usage_limits || changes.active_account_id) {
+    if (changes.today || changes.usage_limits || changes.active_account_id || changes.user_name || changes.user_email || changes.user_plan) {
       refreshDashboard().catch(() => {});
       const histTab = el('tab-history');
       if (histTab && histTab.classList.contains('px-tab-active')) {
