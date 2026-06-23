@@ -2892,7 +2892,8 @@ function getCSS() {
   border: 1px solid rgba(255,255,255,0.08);
 }
 #usagex-v2-root.ux-minimized #ux-bars-section,
-#usagex-v2-root.ux-minimized #ux-peak-strip-wrap { display: none; }
+#usagex-v2-root.ux-minimized #ux-peak-strip-wrap,
+#usagex-v2-root.ux-minimized #ux-effort-section { display: none; }
 #usagex-v2-root.ux-minimized .ux-header { margin-bottom: 0; }
 #usagex-v2-root .ux-icon-expand { display: none !important; }
 #usagex-v2-root.ux-minimized .ux-icon-minimize { display: none !important; }
