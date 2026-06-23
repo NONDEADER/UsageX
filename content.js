@@ -798,6 +798,20 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
     updateUI().catch(() => { });
     debugLog('history_synced', { newMsgs, newTokenDelta });
   }
+
+  // Save conversation name whenever we have one, independent of new message count.
+  // The name-save inside if (updated) only runs when newMsgs > 0, which misses
+  // the case where all messages are already counted but the name was never stored.
+  if (convoId && convoName) {
+    const nameRes = await browser.storage.local.get('conv_stats');
+    const nameStats = nameRes.conv_stats || {};
+    if (nameStats[convoId] && !nameStats[convoId].name) {
+      const namedConvo = { ...nameStats[convoId], name: convoName };
+      nameStats[convoId] = namedConvo;
+      await browser.storage.local.set({ conv_stats: nameStats });
+      await UsageXDB.saveConvoStats(convoId, namedConvo).catch(() => {});
+    }
+  }
 }
 
 function effortThinkTokens(effort) {

@@ -732,6 +732,17 @@ async function initHistory() {
   const allHistory = await UsageXDB.getAllDailyStats();
   const topConvos = await UsageXDB.getTopConversations(5);
 
+  // Merge live conv_stats from storage.local with IndexedDB results.
+  // storage.local is the live source; IndexedDB may be behind or empty.
+  const liveConvStats = resLocal.conv_stats || {};
+  const convoMap = {};
+  Object.entries(liveConvStats).forEach(([id, s]) => { convoMap[id] = { ...s, convoId: id }; });
+  topConvos.forEach(c => { convoMap[c.convoId] = { ...convoMap[c.convoId], ...c }; });
+  const mergedTopConvos = Object.values(convoMap)
+    .filter(c => (c.tokens_est || 0) > 0)
+    .sort((a, b) => (b.tokens_est || 0) - (a.tokens_est || 0))
+    .slice(0, 5);
+
   const pastDays = allHistory.filter(d => d.date !== todayDate);
   const allDays = [...pastDays, today].filter(Boolean);
 
@@ -785,7 +796,7 @@ async function initHistory() {
   if (maxEl) maxEl.textContent = maxTokens > 0 ? `~${formatTokens(maxTokens)}` : '—';
 
   renderHeatmap(last30Days);
-  renderTopConversations(topConvos);
+  renderTopConversations(mergedTopConvos);
   const activeDaysList = allDays.filter(d => (d.msgs || 0) > 0 || (d.tokens_est || 0) > 0);
   renderDailyLog([...activeDaysList].reverse());
 }
