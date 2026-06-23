@@ -1774,10 +1774,49 @@ kbd {
 }
 
 .px-history-detail-metrics {
-  font-size: 10px;
-  color: var(--px-text-3);
-  padding: 0 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 4px;
 }
+
+.px-history-metric-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.px-history-metric-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--px-text-4);
+  min-width: 46px;
+  flex-shrink: 0;
+}
+
+.px-history-metric-vals {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.px-history-metric-vals span {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--px-text-3);
+}
+
+.px-history-metric-vals strong {
+  font-weight: 700;
+}
+.px-history-metric-vals span.px-hml-low  { color: #64748b; }
+.px-history-metric-vals span.px-hml-med  { color: #f59e0b; }
+.px-history-metric-vals span.px-hml-high { color: #f97316; }
+.px-history-metric-vals span.px-hml-max  { color: #ef4444; }
+.px-history-metric-vals span.px-hml-on   { color: #4ade80; }
+.px-history-metric-vals span.px-hml-off  { color: var(--px-text-3); }
 
 .px-history-date {
   font-size: 11px;

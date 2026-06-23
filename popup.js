@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 
 if (typeof browser === 'undefined') var browser = chrome;
 
@@ -895,6 +895,13 @@ function renderDailyLog(historyDesc) {
     listEl.innerHTML = '<div class="px-history-empty">No history yet. Use Claude to build history.</div>';
     return;
   }
+
+  // Save which rows are currently expanded (by date) so re-renders preserve state
+  const expandedDates = new Set();
+  listEl.querySelectorAll('.px-history-row.expanded[data-date]').forEach(row => {
+    expandedDates.add(row.dataset.date);
+  });
+
   listEl.innerHTML = historyDesc.map(d => {
     const mu = d.models_used || {};
     const lastModel = d.last_model || null;
@@ -924,23 +931,39 @@ function renderDailyLog(historyDesc) {
 
     let metricsHtml = '';
     if (hasEffort || hasThinking) {
-      let subparts = [];
+      const metricRows = [];
       if (hasEffort) {
-        subparts.push(`Effort: Low ${eb.low || 0} &middot; Med ${eb.medium || 0} &middot; High ${eb.high || 0} &middot; Max ${eb.max || 0}`);
+        metricRows.push(
+          `<div class="px-history-metric-row">` +
+          `<span class="px-history-metric-label">Effort</span>` +
+          `<span class="px-history-metric-vals">` +
+          `<span class="px-hml-low">Low <strong>${eb.low || 0}</strong></span>` +
+          `<span class="px-hml-med">Med <strong>${eb.medium || 0}</strong></span>` +
+          `<span class="px-hml-high">High <strong>${eb.high || 0}</strong></span>` +
+          `<span class="px-hml-max">Max <strong>${eb.max || 0}</strong></span>` +
+          `</span></div>`
+        );
       }
       if (hasThinking) {
-        subparts.push(`Thinking: ON ${et.on || 0} &middot; OFF ${et.off || 0}`);
+        metricRows.push(
+          `<div class="px-history-metric-row">` +
+          `<span class="px-history-metric-label">Thinking</span>` +
+          `<span class="px-history-metric-vals">` +
+          `<span class="px-hml-on">ON <strong>${et.on || 0}</strong></span>` +
+          `<span class="px-hml-off">OFF <strong>${et.off || 0}</strong></span>` +
+          `</span></div>`
+        );
       }
-      metricsHtml = `<div class="px-history-detail-metrics">${subparts.join(' &nbsp;&middot;&nbsp; ')}</div>`;
+      metricsHtml = `<div class="px-history-detail-metrics">${metricRows.join('')}</div>`;
     }
 
     const hasDetails = pillsHtml || metricsHtml;
 
     return `
-      <div class="px-history-row ${hasDetails ? 'px-history-expandable' : ''}">
+      <div class="px-history-row ${hasDetails ? 'px-history-expandable' : ''}" data-date="${d.date || ''}">
         <div class="px-history-summary">
-          <span class="px-history-date">${d.date || '—'}</span>
-          <span class="px-history-stats">${d.msgs || 0} msgs · ~${formatTokens(d.tokens_est || 0)} tok · ${formatDuration(d.time_s)}</span>
+          <span class="px-history-date">${d.date || '&mdash;'}</span>
+          <span class="px-history-stats">${d.msgs || 0} msgs &middot; ~${formatTokens(d.tokens_est || 0)} tok &middot; ${formatDuration(d.time_s)}</span>
         </div>
         ${hasDetails ? `
         <div class="px-history-details">
@@ -949,6 +972,15 @@ function renderDailyLog(historyDesc) {
         </div>` : ''}
       </div>`;
   }).join('');
+
+  // Restore expanded state for rows that were open before the re-render
+  if (expandedDates.size > 0) {
+    listEl.querySelectorAll('.px-history-row[data-date]').forEach(row => {
+      if (expandedDates.has(row.dataset.date)) {
+        row.classList.add('expanded');
+      }
+    });
+  }
 }
 
 // ─── Tools ───────────────────────────────────────────────────────────────────
