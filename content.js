@@ -1493,21 +1493,21 @@ async function updateUI() {
   setEl('#ux-debug-count', `${dbgCount}`);
 
   const sessionRemainingEstimate = estimateMessagesRemaining(sessionPct, usage_limits?.session_resets_at, debugLogs);
-  // Fold messages-remaining into the session track tooltip instead of a separate line
   const sessionTrackForRemaining = root.querySelector('#ux-session-track');
   if (sessionTrackForRemaining) {
     let tipText = getSessionTooltipText(sessionPct);
-    if (sessionRemainingEstimate != null && tipText) {
-      tipText += ` · ~${sessionRemainingEstimate} msgs left`;
-    }
     if (tipText && Number(sessionPct) > 0) {
       sessionTrackForRemaining.setAttribute('data-tooltip', tipText);
     }
   }
-  // Hide the old separate element if it exists
   const sessionRemainingEl = root.querySelector('#ux-session-remaining');
   if (sessionRemainingEl) {
-    sessionRemainingEl.style.display = 'none';
+    if (sessionRemainingEstimate != null) {
+      sessionRemainingEl.innerHTML = `<div class="ux-time-line"><span class="ux-time-reset"><svg class="ux-reset-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>~${sessionRemainingEstimate} messages left</span></div>`;
+      sessionRemainingEl.style.display = 'block';
+    } else {
+      sessionRemainingEl.style.display = 'none';
+    }
   }
 
   // Settings panel state
@@ -3231,7 +3231,7 @@ function getCSS() {
   margin-top: 3px;
 }
 #ux-session-remaining {
-  display: none;
+  display: block;
 }
 .ux-export-chip {
   display: none;
