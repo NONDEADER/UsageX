@@ -534,7 +534,7 @@ function renderSparkline(history, today) {
 
   // Build last 7 data points: history days + today
   const allDays = [...history.slice(-6), today].filter(Boolean);
-  if (allDays.length < 2) {
+  if (allDays.length < 1) {
     if (section) section.style.display = 'none';
     return;
   }
@@ -546,7 +546,7 @@ function renderSparkline(history, today) {
   const n = vals.length;
 
   const pts = vals.map((v, i) => {
-    const x = padX + (i / (n - 1)) * (W - padX * 2);
+    const x = n > 1 ? padX + (i / (n - 1)) * (W - padX * 2) : W / 2;
     const y = H - padY - ((v / maxV) * (H - padY * 2));
     return [x, y];
   });
@@ -615,6 +615,11 @@ function renderSparkline(history, today) {
       const day = new Date(d.date + 'T12:00:00').getDay();
       return `<span>${days[day]}</span>`;
     }).join('');
+    if (n === 1) {
+      labelsEl.style.justifyContent = 'center';
+    } else {
+      labelsEl.style.justifyContent = 'space-between';
+    }
   }
 
   // Interactive hover label
@@ -771,7 +776,8 @@ async function initHistory() {
 
   renderHeatmap(last30Days);
   renderTopConversations(topConvos);
-  renderDailyLog([...pastDays].reverse());
+  const activeDaysList = allDays.filter(d => (d.msgs || 0) > 0 || (d.tokens_est || 0) > 0);
+  renderDailyLog([...activeDaysList].reverse());
 }
 
 function renderHeatmap(days) {
@@ -910,7 +916,7 @@ function renderDailyLog(historyDesc) {
     const hasDetails = pillsHtml || metricsHtml;
 
     return `
-      <div class="px-history-row ${hasDetails ? 'px-history-expandable' : ''}" ${hasDetails ? 'onclick="this.classList.toggle(\'expanded\')"' : ''}>
+      <div class="px-history-row ${hasDetails ? 'px-history-expandable' : ''}">
         <div class="px-history-summary">
           <span class="px-history-date">${d.date || '—'}</span>
           <span class="px-history-stats">${d.msgs || 0} msgs · ~${formatTokens(d.tokens_est || 0)} tok · ${formatDuration(d.time_s)}</span>
@@ -1070,6 +1076,17 @@ async function init() {
       }
     }
   });
+
+  // Setup secure click handler for history log details (avoids inline onclick CSP block)
+  const listEl = el('px-history-list');
+  if (listEl) {
+    listEl.addEventListener('click', (e) => {
+      const row = e.target.closest('.px-history-expandable');
+      if (row) {
+        row.classList.toggle('expanded');
+      }
+    });
+  }
 
   // Load History tab data on click to ensure stats are always fresh
   const histTab = el('tab-history');
