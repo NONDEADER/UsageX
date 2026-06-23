@@ -179,6 +179,16 @@ function calcUsageRateState(sessionPct, sessionResetsAt) {
 
 function el(id) { return document.getElementById(id); }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
 function setBar(barId, pct) {
   const b = el(barId);
   if (b) b.style.width = Math.min(100, Math.max(0, pct || 0)) + '%';
@@ -850,7 +860,7 @@ function renderTopConversations(entries) {
 
   const topTokens = entries[0].tokens_est || 1;
   listEl.innerHTML = entries.map((c, i) => {
-    const name = c.name || `Conversation ${i + 1}`;
+    const name = escapeHtml(c.name || `Conversation ${i + 1}`);
     const barW = Math.round(((c.tokens_est || 0) / topTokens) * 100);
     const ts = c.last_active ? new Date(c.last_active).toLocaleDateString() : '';
     return `
