@@ -28,6 +28,10 @@
   --px-radius: 8px;
   --px-radius-sm: 5px;
 
+  /* Heatmap Configuration */
+  --px-hm-cell-size: 14px;
+  --px-hm-gap: 4px;
+
   --px-font: "Inter", "Styrene B Web", "Styrene B", "Styrene A Web", "Styrene A", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
@@ -1581,14 +1585,15 @@ kbd {
 }
 
 .px-heatmap-filter-pill {
-  font-family: monospace;
-  font-size: 9.5px;
+  font-family: var(--px-font);
+  font-size: 9px;
   color: var(--px-text-3);
   background: var(--px-surface-3);
   border: 1px solid var(--px-border);
   padding: 2.5px 8px;
   border-radius: 12px;
   user-select: none;
+  font-weight: 500;
 }
 
 .px-heatmap-total-est {
@@ -1605,59 +1610,103 @@ kbd {
 .px-heatmap-legend {
   display: flex;
   align-items: center;
-  gap: 3.5px;
+  gap: 4px;
 }
 
 .px-hm-legend-label {
-  font-family: monospace;
-  font-size: 9px;
+  font-family: var(--px-font);
+  font-size: 8.5px;
   color: var(--px-text-4);
   user-select: none;
+  font-weight: 500;
 }
 
 .px-heatmap-legend .px-hm-cell {
-  width: 9px;
-  height: 9px;
+  width: 10px;
+  height: 10px;
   border-radius: 2.5px;
   flex-shrink: 0;
 }
 
 .px-heatmap-container {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   background: var(--px-surface);
   border: 1px solid var(--px-border);
   border-radius: var(--px-radius);
-  padding: 10px 10px;
+  padding: 12px 14px;
+  gap: 16px;
+}
+
+.px-heatmap-left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.px-heatmap-divider {
+  width: 1px;
+  align-self: stretch;
+  background: var(--px-border);
+}
+
+.px-heatmap-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.px-hm-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.px-hm-stat-label {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--px-text-4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.px-hm-stat-val {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--px-text-2);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
 }
 
 .px-heatmap-y-labels {
   display: grid;
-  grid-template-rows: repeat(7, 9px);
-  gap: 3px;
-  font-family: monospace;
-  font-size: 8.5px;
-  line-height: 9px;
-  color: var(--px-text-4);
+  grid-template-rows: repeat(7, var(--px-hm-cell-size));
+  gap: var(--px-hm-gap);
+  font-family: var(--px-font);
+  font-size: 9.5px;
+  line-height: var(--px-hm-cell-size);
+  color: var(--px-text-3);
   text-align: right;
-  margin-right: 8px;
+  margin-right: 12px;
   user-select: none;
-  width: 20px;
+  width: 24px;
 }
 
 .px-heatmap {
   display: grid;
-  grid-template-rows: repeat(7, 9px);
+  grid-template-rows: repeat(7, var(--px-hm-cell-size));
   grid-auto-flow: column;
-  gap: 3px;
+  gap: var(--px-hm-gap);
 }
 
 .px-hm-cell {
-  width: 9px;
-  height: 9px;
-  border-radius: 2.5px;
-  cursor: default;
-  transition: transform 0.15s ease, background-color 0.15s ease;
+  width: var(--px-hm-cell-size);
+  height: var(--px-hm-cell-size);
+  border-radius: 3.5px;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.15s ease;
 }
 
 .px-hm-cell:not(.px-hm-future):hover {
@@ -1666,7 +1715,7 @@ kbd {
 }
 
 .px-hm-0 {
-  background: #181818;
+  background: var(--px-surface-2);
 }
 
 .px-hm-1 {

@@ -720,8 +720,32 @@ async function initHistory() {
   const pastDays = allHistory.filter(d => d.date !== todayDate);
   const allDays = [...pastDays, today].filter(Boolean);
 
+  const cutoffDate = (() => {
+    try {
+      const tz = ianaTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      });
+      const parts = formatter.formatToParts(d);
+      const year = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      const day = parts.find(p => p.type === 'day').value;
+      return `${year}-${month}-${day}`;
+    } catch (e) {
+      const d = new Date();
+      d.setDate(d.getDate() - 29);
+      return d.toISOString().slice(0, 10);
+    }
+  })();
+  const last30Days = allDays.filter(d => d.date && d.date >= cutoffDate);
+
   // Compute total tokens for the header
-  const totalTok = allDays.reduce((sum, d) => sum + (d.tokens_est || 0), 0);
+  const totalTok = last30Days.reduce((sum, d) => sum + (d.tokens_est || 0), 0);
   const totalEl = el('px-heatmap-total-est');
   if (totalEl) {
     if (totalTok > 0) {
@@ -731,7 +755,21 @@ async function initHistory() {
     }
   }
 
-  renderHeatmap(allDays);
+  // Calculate 30-day stats
+  const activeDays = last30Days.filter(d => (d.tokens_est || 0) > 0).length;
+  const avgTokens = Math.round(totalTok / 30);
+  const maxTokens = Math.max(...last30Days.map(d => d.tokens_est || 0), 0);
+
+  const avgEl = el('px-hm-stat-avg');
+  if (avgEl) avgEl.textContent = `~${formatTokens(avgTokens)}`;
+
+  const activeEl = el('px-hm-stat-active');
+  if (activeEl) activeEl.textContent = `${activeDays} / 30 days`;
+
+  const maxEl = el('px-hm-stat-max');
+  if (maxEl) maxEl.textContent = maxTokens > 0 ? `~${formatTokens(maxTokens)}` : '—';
+
+  renderHeatmap(last30Days);
   renderTopConversations(topConvos);
   renderDailyLog([...pastDays].reverse());
 }
@@ -746,14 +784,14 @@ function renderHeatmap(days) {
 
   const maxTok = Math.max(...Object.values(lookup), 1);
 
-  // Determine the grid start: go back 20 weeks (140 days), then rewind to
+  // Determine the grid start: go back 30 days (29 days ago), then rewind to
   // the start of that week (Sunday = 0).
   const today = new Date();
   today.setHours(12, 0, 0, 0);
 
-  // Start from 20 weeks ago, aligned to a Sunday
+  // Start from 30 days ago, aligned to a Sunday
   const startDate = new Date(today);
-  startDate.setDate(today.getDate() - 139);
+  startDate.setDate(today.getDate() - 29);
   // Rewind to Sunday of that week
   const dayOfWeek = startDate.getDay(); // 0 = Sun
   startDate.setDate(startDate.getDate() - dayOfWeek);
