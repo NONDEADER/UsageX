@@ -549,10 +549,19 @@ browser.storage.onChanged.addListener(storageOnChangedHandler);
 
 // ─── Message tracking ──────────────────────────────────────────────────────────
 
-function getPromptFingerprint(text) {
+// djb2 hash over the full message text — avoids the false-positive collisions
+// that the old length+prefix fingerprint caused when two different messages
+// shared the same length and first 50 characters.
+function hashPrompt(text) {
   if (!text) return '';
   const cleaned = text.trim();
-  return `${cleaned.length}_${cleaned.slice(0, 50)}`;
+  if (!cleaned) return '';
+  let h = 5381;
+  for (let i = 0; i < cleaned.length; i++) {
+    h = Math.imul(h, 33) ^ cleaned.charCodeAt(i);
+  }
+  // Convert to unsigned base-36 string for a compact, collision-resistant key.
+  return (h >>> 0).toString(36);
 }
 
 async function onMessageSent(req) {
@@ -585,12 +594,14 @@ async function onMessageSent(req) {
   const tokenDelta = inputTokens + thinkTokens;
   const { today } = await loadToday();
 
-  // Record fingerprint to avoid double counting when history is loaded
-  const fingerprint = getPromptFingerprint(promptText);
+  // Record hash to avoid double-counting when history sync runs later.
+  // Window is 200 so a burst of messages doesn't evict earlier hashes before
+  // history sync has a chance to match them.
+  const fingerprint = hashPrompt(promptText);
   const recent = today.recent_sent_prompts || [];
   if (fingerprint) {
     recent.push(fingerprint);
-    if (recent.length > 20) recent.shift();
+    if (recent.length > 200) recent.shift();
   }
 
   const lastModelToUse = modelId || today.last_model || null;
@@ -718,7 +729,7 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
         promptText = msg.content;
       }
 
-      const fingerprint = getPromptFingerprint(promptText);
+      const fingerprint = hashPrompt(promptText);
       const recent = today.recent_sent_prompts || [];
       const matchIndex = recent.indexOf(fingerprint);
 
