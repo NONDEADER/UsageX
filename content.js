@@ -168,6 +168,7 @@ function freshToday(ianaTz) {
     last_model: null,
     models_used: {},
     processed_msg_uuids: [],
+    convo_ids: [],
     recent_sent_prompts: []
   };
 }
@@ -1013,10 +1014,16 @@ function checkUrlChange() {
   if (location.href !== lastUrl) {
     lastUrl = location.href;
     if (location.pathname.startsWith('/chat/')) {
-      loadToday().then(({ today }) => {
-        saveToday({ convos: today.convos + 1 });
-      }).catch(() => { });
-      debugLog('new_convo', { url: location.href });
+      const chatId = location.pathname.split('/')[2];
+      if (chatId) {
+        loadToday().then(({ today }) => {
+          const seen = today.convo_ids || [];
+          if (!seen.includes(chatId)) {
+            saveToday({ convos: today.convos + 1, convo_ids: [...seen, chatId] });
+            debugLog('new_convo', { url: location.href });
+          }
+        }).catch(() => { });
+      }
     }
     setTimeout(() => updateUI().catch(() => { }), 500);
   }
