@@ -3107,6 +3107,40 @@ function getCSS() {
 #ux-toast-container .ux-toast-close[data-tooltip]:hover::after {
   transform: translateY(0);
 }
+/* Effort Pills Tooltips: Low and Med align left, High and Max align right, all above */
+#usagex-v2-root #ux-ep-low[data-tooltip]::after,
+#usagex-v2-root #ux-ep-med[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  left: 0;
+  transform: translateY(3px);
+}
+#usagex-v2-root #ux-ep-low[data-tooltip]:hover::after,
+#usagex-v2-root #ux-ep-med[data-tooltip]:hover::after {
+  transform: translateY(0);
+}
+#usagex-v2-root #ux-ep-high[data-tooltip]::after,
+#usagex-v2-root #ux-ep-max[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  left: auto;
+  right: 0;
+  transform: translateY(3px);
+}
+#usagex-v2-root #ux-ep-high[data-tooltip]:hover::after,
+#usagex-v2-root #ux-ep-max[data-tooltip]:hover::after {
+  transform: translateY(0);
+}
+#usagex-v2-root .ux-extended-badge[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  left: auto;
+  right: 0;
+  transform: translateY(3px);
+}
+#usagex-v2-root .ux-extended-badge[data-tooltip]:hover::after {
+  transform: translateY(0);
+}
 .ux-icon-row { display: flex; gap: 2px; }
 .ux-icn {
   width: 26px; height: 26px; border-radius: 6px;
@@ -3693,12 +3727,13 @@ function getCSS() {
 .ux-collapsible-section .ux-section-body {
   max-height: 500px;
   opacity: 1;
-  overflow: hidden;
+  overflow: visible;
   transition: max-height 0.25s ease-out, opacity 0.2s ease-in, margin-top 0.25s;
 }
 .ux-collapsible-section.ux-section-collapsed .ux-section-body {
   max-height: 0 !important;
   opacity: 0;
+  overflow: hidden;
   pointer-events: none;
   margin-top: 0 !important;
 }

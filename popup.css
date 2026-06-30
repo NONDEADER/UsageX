@@ -184,7 +184,6 @@ body {
   display: none;
   padding: 12px 14px 14px;
   overflow-y: auto;
-  overflow-x: hidden;
   flex: 1;
   scrollbar-width: thin;
   scrollbar-color: #333 transparent;
@@ -1044,6 +1043,34 @@ kbd {
   transform: translateY(0);
 }
 
+/* Align extended-badge tooltip above and right-anchored — badges sit at the right
+   side of the panel row; default centering would overflow the popup right edge */
+.px-extended-badge[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  left: auto;
+  right: 0;
+  transform: translateY(3px);
+}
+
+.px-extended-badge[data-tooltip]:hover::after {
+  transform: translateY(0);
+}
+
+/* Align conversation-name tooltip above the element — items can appear near the
+   panel bottom when scrolled, so appearing above keeps it in the visible area */
+.px-convo-name[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+  white-space: nowrap;
+  max-width: 280px;
+}
+
+.px-convo-name[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
 /* ─── Guide / Help Panel ────────────────────────────────── */
 #panel-help {
   max-height: 480px;
@@ -1431,7 +1458,8 @@ kbd {
 
 /* ─── Sparkline Chart (Feature 1) ──────────────────────────── */
 .px-chart-wrap {
-  overflow: hidden;
+  position: relative;
+  overflow: visible;
   border-radius: var(--px-radius-sm);
   background: var(--px-surface-3);
   padding: 6px 4px 2px;
@@ -1442,6 +1470,26 @@ kbd {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.px-spark-tooltip-anchor {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  z-index: 10;
+}
+.px-spark-tooltip-anchor[data-tooltip]::after {
+  top: auto;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+}
+.px-spark-tooltip-anchor[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
 }
 
 .px-chart-labels {
@@ -1944,4 +1992,36 @@ circle.px-spark-point:hover {
 
 .px-hm-cell[data-tooltip]:hover::after {
   transform: translateX(-50%) translateY(0);
+}
+
+/* First-row cells tooltip positioning (flip to appear below instead of above) */
+.px-hm-cell:nth-child(7n+1)[data-tooltip]::after {
+  top: calc(100% + 6px);
+  bottom: auto;
+  transform: translateX(-50%) translateY(-3px);
+}
+.px-hm-cell:nth-child(7n+1)[data-tooltip]:hover::after {
+  transform: translateX(-50%) translateY(0);
+}
+
+/* First and second columns tooltip positioning (align to the left to prevent clipping on left edge) */
+.px-hm-cell:nth-child(-n+14)[data-tooltip]::after {
+  left: 0;
+  transform: translateY(3px);
+}
+.px-hm-cell:nth-child(-n+14)[data-tooltip]:hover::after {
+  transform: translateY(0);
+}
+
+/* First and second columns of the first row (cells 1 and 8: flip below and align left) */
+.px-hm-cell:nth-child(1)[data-tooltip]::after,
+.px-hm-cell:nth-child(8)[data-tooltip]::after {
+  top: calc(100% + 6px);
+  bottom: auto;
+  left: 0;
+  transform: translateY(-3px);
+}
+.px-hm-cell:nth-child(1)[data-tooltip]:hover::after,
+.px-hm-cell:nth-child(8)[data-tooltip]:hover::after {
+  transform: translateY(0);
 }

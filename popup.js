@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 if (typeof browser === 'undefined') var browser = chrome;
 
@@ -612,10 +612,13 @@ function renderSparkline(history, today) {
       <!-- Spark points -->
       ${pts.map(([x, y], i) => `
         <circle class="px-spark-point" cx="${x}" cy="${y}" r="3" fill="#cc9966" data-index="${i}">
-          <title>${allDays[i].date || ''}: ~${formatTokens(vals[i])} tokens</title>
         </circle>
       `).join('')}
-    </svg>`;
+    </svg>
+    ${pts.map(([x, y], i) => {
+      const dateStr = allDays[i].date ? new Date(allDays[i].date + 'T12:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : 'Today';
+      return `<div class="px-spark-tooltip-anchor" style="position: absolute; left: ${(x / W) * 100}%; top: ${(y / H) * 100}%;" data-tooltip="${dateStr}: ~${formatTokens(vals[i])} tokens"></div>`;
+    }).join('')}`;
 
   // Day labels: Mon/Tue/…
   if (labelsEl) {
@@ -693,22 +696,22 @@ function renderSparkline(history, today) {
       hoverValEl.textContent = `Avg: ~${formatTokens(avgTokens)}`;
     };
 
-    svgEl.addEventListener('mousemove', (e) => {
+    chartEl.addEventListener('mousemove', (e) => {
       handleHover(e.clientX);
     });
 
-    svgEl.addEventListener('mouseleave', () => {
+    chartEl.addEventListener('mouseleave', () => {
       resetHover();
     });
 
     // Touch events for mobile compatibility
-    svgEl.addEventListener('touchmove', (e) => {
+    chartEl.addEventListener('touchmove', (e) => {
       if (e.touches && e.touches[0]) {
         handleHover(e.touches[0].clientX);
       }
     }, { passive: true });
 
-    svgEl.addEventListener('touchend', () => {
+    chartEl.addEventListener('touchend', () => {
       resetHover();
     });
   }
@@ -877,7 +880,7 @@ function renderTopConversations(entries) {
     return `
       <div class="px-convo-row">
         <div class="px-convo-header">
-          <span class="px-convo-name" title="${name}">${name}</span>
+          <span class="px-convo-name" data-tooltip="${name}">${name}</span>
           <span class="px-convo-date">${ts}</span>
         </div>
         <div class="px-convo-bar-wrap">
