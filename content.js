@@ -229,7 +229,7 @@ function setupSidebarResizeObserver(root) {
     for (const entry of entries) {
       const width = entry.contentRect.width;
       const isFloating = root.classList.contains('ux-floating');
-      if (!isFloating && width > 0 && width < 180) {
+      if (!isFloating && width < 180) {
         root.classList.add('ux-parent-collapsed');
       } else {
         root.classList.remove('ux-parent-collapsed');
@@ -1089,9 +1089,16 @@ function injectStyles() {
 }
 
 function findInjectTarget() {
+  const isSidebarEl = (el) => {
+    if (!el || el.offsetWidth <= 10 || el.offsetWidth > 400) return false;
+    const cs = window.getComputedStyle(el);
+    if (cs.pointerEvents === 'none') return false;
+    return true;
+  };
   const userBtn = document.querySelector('[data-testid="user-menu-button"]');
   if (userBtn) {
-    return userBtn.closest('nav') || userBtn.closest('[class*="sidebar"]') || userBtn.closest('[class*="Sidebar"]') || userBtn.closest('[class*="side"]') || userBtn.closest('div');
+    const candidate = userBtn.closest('nav') || userBtn.closest('[class*="sidebar"]') || userBtn.closest('[class*="Sidebar"]') || userBtn.closest('[class*="side"]') || null;
+    return isSidebarEl(candidate) ? candidate : null;
   }
   const strategies = [
     () => document.querySelector('nav[class*="sidebar"]'),
@@ -1100,7 +1107,7 @@ function findInjectTarget() {
     () => document.querySelector('[class*="sidebar"]'),
   ];
   for (const fn of strategies) {
-    try { const el = fn(); if (el) return el; } catch (_) { }
+    try { const el = fn(); if (isSidebarEl(el)) return el; } catch (_) { }
   }
   return null;
 }
