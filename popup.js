@@ -798,13 +798,13 @@ async function initHistory() {
   const maxEl = el('px-hm-stat-max');
   if (maxEl) maxEl.textContent = maxTokens > 0 ? `~${formatTokens(maxTokens)}` : '—';
 
-  renderHeatmap(last30Days);
+  renderHeatmap(last30Days, ianaTz);
   renderTopConversations(mergedTopConvos);
   const activeDaysList = allDays.filter(d => (d.msgs || 0) > 0 || (d.tokens_est || 0) > 0);
   renderDailyLog([...activeDaysList].reverse());
 }
 
-function renderHeatmap(days) {
+function renderHeatmap(days, ianaTz) {
   const el_ = el('px-heatmap');
   if (!el_) return;
 
@@ -830,7 +830,12 @@ function renderHeatmap(days) {
   const cursor = new Date(startDate);
 
   while (cursor <= today) {
-    const dateStr = cursor.toISOString().slice(0, 10);
+    const tz = ianaTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const hFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+    });
+    const hParts = hFmt.formatToParts(cursor);
+    const dateStr = `${hParts.find(p => p.type === 'year').value}-${hParts.find(p => p.type === 'month').value}-${hParts.find(p => p.type === 'day').value}`;
     const isFuture = cursor > today;
     const tok = lookup[dateStr] || 0;
     const ratio = tok / maxTok;

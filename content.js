@@ -652,7 +652,8 @@ async function onMessageSent(req) {
 async function onConversationHistory(chatMessages, convoId, convoName, modelId, thinkingMode) {
   if (!Array.isArray(chatMessages)) return;
 
-  const { today } = await loadToday();
+  const { today, settings } = await loadToday();
+  const ianaTz = getIANATimezone(settings.timezone);
   if (!today.processed_msg_uuids) {
     today.processed_msg_uuids = [];
   }
@@ -669,10 +670,19 @@ async function onConversationHistory(chatMessages, convoId, convoName, modelId, 
 
   const isMessageToday = (dateStr) => {
     try {
-      // Compare the message date string against the stored today.date
-      // today.date is already computed with the correct timezone in loadToday()
-      const msgDateOnly = dateStr ? dateStr.slice(0, 10) : '';
-      return msgDateOnly === today.date;
+      if (!dateStr) return false;
+      // Convert the UTC API timestamp to a local YYYY-MM-DD string using the
+      // same IANA timezone as today.date, then compare. A raw .slice(0,10)
+      // would give the UTC date, which differs from the local date near midnight.
+      const tz = ianaTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit'
+      });
+      const parts = formatter.formatToParts(new Date(dateStr));
+      const year  = parts.find(p => p.type === 'year').value;
+      const month = parts.find(p => p.type === 'month').value;
+      const day   = parts.find(p => p.type === 'day').value;
+      return `${year}-${month}-${day}` === today.date;
     } catch (_) {
       return false;
     }
