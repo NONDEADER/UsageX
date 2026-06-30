@@ -4145,7 +4145,7 @@ async function fetchUsageLimitsActive() {
     }
 
     // Use the org UUID as the account identifier — proven to work, unlike /api/me (404)
-    await handleUserInfo(orgId, orgName);
+    await handleUserInfo(orgId);
 
     // Fetch /api/account to get the real user name + email.
     // Claude's API uses /api/account (not /api/me which returns 404).
