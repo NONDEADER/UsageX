@@ -1,4 +1,5 @@
 (function() {
+  const UX_SECRET = 'ux-secret-d3b073c1-eb01-447b-839f-3d604bde66a8';
   let cachedUserInfo = null;
 
   // ── DOM scraping fallback ──
@@ -93,14 +94,17 @@
   function broadcastUserInfo(info) {
     if (!info) return;
     cachedUserInfo = info;
-    window.postMessage({ type: '__ux_user_info', uuid: info.uuid || info.email || '', email: info.email, name: info.name || '', plan: info.plan || '' }, '*');
+    window.postMessage({ type: '__ux_user_info', secret: UX_SECRET, uuid: info.uuid || info.email || '', email: info.email, name: info.name || '', plan: info.plan || '' }, '*');
   }
 
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
+    const allowedOrigins = ['https://claude.ai', 'https://www.claude.ai'];
+    if (!allowedOrigins.includes(event.origin)) return;
+    if (!event.data || event.data.secret !== UX_SECRET) return;
     if (event.data.type === '__ux_request_user_info') {
       if (cachedUserInfo) {
-        window.postMessage({ type: '__ux_user_info', ...cachedUserInfo }, '*');
+        window.postMessage({ type: '__ux_user_info', secret: UX_SECRET, ...cachedUserInfo }, '*');
       } else {
         // Try DOM scraping as a fallback
         const domInfo = scrapeUserInfoFromDOM();
@@ -153,7 +157,7 @@
           const convoId = convoIdMatch ? convoIdMatch[1] : null;
           
           if (reqBody) {
-            window.postMessage({ type: '__ux_fetch_msg', body: reqBody, convoId }, '*');
+            window.postMessage({ type: '__ux_fetch_msg', secret: UX_SECRET, body: reqBody, convoId }, '*');
           }
         })().catch(() => {});
       }
@@ -178,7 +182,7 @@
                 name = json.profile.name;
               }
               cachedUserInfo = { uuid: json.uuid, email: json.email_address || json.email || '', name };
-              window.postMessage({ type: '__ux_user_info', ...cachedUserInfo }, '*');
+              window.postMessage({ type: '__ux_user_info', secret: UX_SECRET, ...cachedUserInfo }, '*');
             }
 
             // Intercept current user info from /api/account (primary Claude endpoint)
@@ -208,7 +212,7 @@
 
               if (uuid || email) {
                 cachedUserInfo = { uuid, email, name, plan };
-                window.postMessage({ type: '__ux_user_info', ...cachedUserInfo }, '*');
+                window.postMessage({ type: '__ux_user_info', secret: UX_SECRET, ...cachedUserInfo }, '*');
               }
             }
             
@@ -220,11 +224,11 @@
               const convoName = typeof json.name === 'string' ? json.name : null;
               const modelId = json.model?.id || json.model || json.model_id || null;
               const thinkingMode = json.settings?.thinking_mode || json.effective_thinking_mode || null;
-              window.postMessage({ type: '__ux_convo_history', data: json.chat_messages, convoId, convoName, modelId, thinkingMode }, '*');
+              window.postMessage({ type: '__ux_convo_history', secret: UX_SECRET, data: json.chat_messages, convoId, convoName, modelId, thinkingMode }, '*');
             }
 
             if (json.five_hour || json.seven_day) {
-              window.postMessage({ type: '__ux_usage_data', data: {
+              window.postMessage({ type: '__ux_usage_data', secret: UX_SECRET, data: {
                 session_pct: json.five_hour ? (json.five_hour.utilization ?? null) : null,
                 session_resets_at: json.five_hour ? (json.five_hour.resets_at || null) : null,
                 weekly_pct: json.seven_day ? (json.seven_day.utilization ?? null) : null,

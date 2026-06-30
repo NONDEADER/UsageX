@@ -15,6 +15,7 @@ if (window.__usagex_cleanup) {
 
 const UX_ID = 'usagex-v2-root';
 const UX_STYLE_ID = 'usagex-v2-styles';
+const UX_SECRET = 'ux-secret-d3b073c1-eb01-447b-839f-3d604bde66a8';
 const IDLE_MS = 2 * 60 * 1000;
 const TICK_MS = 10000;
 const SESSION_WINDOW_MS = 5 * 60 * 60 * 1000;
@@ -470,6 +471,9 @@ async function handleUserInfo(uuid, email, name) {
 
 windowMsgHandler = (event) => {
   if (event.source !== window) return;
+  const allowedOrigins = ['https://claude.ai', 'https://www.claude.ai'];
+  if (!allowedOrigins.includes(event.origin)) return;
+  if (!event.data || event.data.secret !== UX_SECRET) return;
   if (event.data.type === '__ux_fetch_msg') {
     onMessageSent({ body: event.data.body, convoId: event.data.convoId || null }).catch(() => { });
   } else if (event.data.type === '__ux_usage_data') {
@@ -4239,7 +4243,7 @@ async function init() {
   // Ask inject.js to replay cached user info (if /api/me was already intercepted)
   // or fall back to DOM scraping. Small delay lets the inject script fully load first.
   setTimeout(() => {
-    window.postMessage({ type: '__ux_request_user_info' }, '*');
+    window.postMessage({ type: '__ux_request_user_info', secret: UX_SECRET }, '*');
   }, 800);
 
   let attempts = 0;
