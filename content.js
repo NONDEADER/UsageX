@@ -229,7 +229,7 @@ function setupSidebarResizeObserver(root) {
     for (const entry of entries) {
       const width = entry.contentRect.width;
       const isFloating = root.classList.contains('ux-floating');
-      if (!isFloating && width < 180) {
+      if (!isFloating && !root.classList.contains('ux-side-right') && width < 180) {
         root.classList.add('ux-parent-collapsed');
       } else {
         root.classList.remove('ux-parent-collapsed');
@@ -2220,6 +2220,7 @@ function bindEvents() {
         } else {
           root.classList.remove('ux-side-right');
         }
+        setupSidebarResizeObserver(root);
       }
       updateUI().catch(() => { });
     });
