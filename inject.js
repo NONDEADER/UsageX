@@ -228,12 +228,20 @@
             }
 
             if (json.five_hour || json.seven_day) {
-              window.postMessage({ type: '__ux_usage_data', secret: UX_SECRET, data: {
-                session_pct: json.five_hour ? (json.five_hour.utilization ?? null) : null,
-                session_resets_at: json.five_hour ? (json.five_hour.resets_at || null) : null,
-                weekly_pct: json.seven_day ? (json.seven_day.utilization ?? null) : null,
-                weekly_resets_at: json.seven_day ? (json.seven_day.resets_at || null) : null,
-              } }, '*');
+              // Extract the real org UUID from Claude's own request URL — this is the
+              // authoritative current org, not a guess. Passed to content.js so the
+              // active polling fetch can use the same org on subsequent calls.
+              const orgMatch = url.match(/\/api\/organizations\/([a-f0-9-]{36})\//i);
+              const interceptedOrgId = orgMatch ? orgMatch[1] : null;
+              window.postMessage({ type: '__ux_usage_data', secret: UX_SECRET,
+                orgId: interceptedOrgId,
+                data: {
+                  session_pct: json.five_hour ? (json.five_hour.utilization ?? null) : null,
+                  session_resets_at: json.five_hour ? (json.five_hour.resets_at || null) : null,
+                  weekly_pct: json.seven_day ? (json.seven_day.utilization ?? null) : null,
+                  weekly_resets_at: json.seven_day ? (json.seven_day.resets_at || null) : null,
+                }
+              }, '*');
             }
             if (url.includes('/completion') || url.includes('/sync/') || url.includes('/chat_conversations')) {
               const found = [];

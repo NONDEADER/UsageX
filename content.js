@@ -480,8 +480,13 @@ windowMsgHandler = (event) => {
   } else if (event.data.type === '__ux_usage_data') {
     (async () => {
       const d = event.data.data;
+      // Persist the org UUID extracted from Claude's real request URL so that
+      // fetchUsageLimitsActive can use the same org on every subsequent poll,
+      // instead of falling back to the arbitrary orgs[0].
+      const updates = { usage_limits: d };
+      if (event.data.orgId) updates.intercepted_org_id = event.data.orgId;
       await updateUsageRate(d.session_pct, d.session_resets_at);
-      await browser.storage.local.set({ usage_limits: d });
+      await browser.storage.local.set(updates);
       await updateUI();
     })().catch(() => { });
   } else if (event.data.type === '__ux_convo_history') {
@@ -4142,7 +4147,13 @@ body.light .ux-toast-close:hover { color: #141413; }
 
 async function fetchUsageLimitsActive() {
   try {
-    let orgId = document.cookie.split('; ').find(row => row.startsWith('lastActiveOrg='))?.split('=')[1] || null;
+    // Prefer the org UUID captured from an intercepted /api/organizations/<uuid>/usage
+    // response — that is always the correct current org (Claude's own page chose it).
+    // Fall back to orgs[0] only on the very first poll at extension load, before any
+    // intercept has fired; at that point there is no fresher data to overwrite, so
+    // using orgs[0] as a bootstrap is safe.
+    const stored = await browser.storage.local.get('intercepted_org_id');
+    let orgId = stored.intercepted_org_id || null;
     let orgName = null;
 
     if (!orgId) {
@@ -4156,7 +4167,7 @@ async function fetchUsageLimitsActive() {
         await debugLog('active_fetch_failed', { reason: 'empty_orgs', stage: 'organizations' });
         return;
       }
-      orgId = orgs[0].uuid;
+      orgId = orgs[0].uuid;   // bootstrap-only; replaced after first intercept
       orgName = orgs[0].name || null;
     }
 
