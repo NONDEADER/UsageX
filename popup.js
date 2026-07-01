@@ -42,6 +42,7 @@ function freshToday(ianaTz) {
 function modelDisplayName(modelId) {
   if (!modelId) return null;
   const id = modelId.toLowerCase();
+  if (id.includes('sonnet-5')) return 'Sonnet 5';
   if (id.includes('sonnet-4-6')) return 'Sonnet 4.6';
   if (id.includes('sonnet-4-5')) return 'Sonnet 4.5';
   if (id.includes('opus-4-8')) return 'Opus 4.8';
@@ -70,6 +71,7 @@ function modelSupportsExtendedToggle(modelId) {
   if (!modelId) return false;
   const id = modelId.toLowerCase();
   return (
+    id.includes('sonnet-5') ||
     id.includes('sonnet-4') || id.includes('opus-4') ||
     id.includes('fable') || id.includes('mythos') ||
     id.includes('thinking') || id.includes('haiku-4-5') || id.includes('haiku-4.5')
@@ -81,6 +83,7 @@ function modelSupportsEffortLevel(modelId) {
   const id = modelId.toLowerCase();
   if (id.includes('haiku-4-5') || id.includes('haiku-4.5')) return false;
   return (
+    id.includes('sonnet-5') ||
     id.includes('sonnet-4') || id.includes('opus-4') ||
     id.includes('fable') || id.includes('mythos') ||
     id.includes('thinking')
