@@ -182,6 +182,7 @@ function defaultSettings() {
     floating: false,
     float_x: null,
     float_y: null,
+    position_locked: false,
     floating_opacity_enabled: true,
     floating_opacity: 0.85,
     minimized: false,
@@ -229,7 +230,7 @@ function setupSidebarResizeObserver(root) {
     for (const entry of entries) {
       const width = entry.contentRect.width;
       const isFloating = root.classList.contains('ux-floating');
-      if (!isFloating && !root.classList.contains('ux-side-right') && width < 180) {
+      if (!isFloating && width < 180) {
         root.classList.add('ux-parent-collapsed');
       } else {
         root.classList.remove('ux-parent-collapsed');
@@ -1209,7 +1210,6 @@ async function injectSidebar() {
       root.style.top = fy + 'px';
       document.body.appendChild(root);
     } else {
-      if (s.sidebar_side === 'right') root.classList.add('ux-side-right');
       sidebar.insertBefore(root, userProfile);
     }
     sidebarInjected = true;
@@ -1227,6 +1227,7 @@ async function injectSidebar() {
 // ─── UI Update ─────────────────────────────────────────────────────────────────
 
 function clamp(v, min, max) { return Math.min(max, Math.max(min, v)); }
+
 
 function getThresholdColor(pct) {
   if (pct == null) return 'var(--ux-accent)';
@@ -1598,18 +1599,63 @@ async function updateUI() {
     toastContainer.className = `ux-toast-pos-${settings.toast_position || 'bottom-right'}`;
   }
 
-  // Update custom sidebar side dropdown label
-  const currentSide = settings.sidebar_side || 'left';
-  const sideLabel = root.querySelector('#ux-side-label');
-  const sideDropdownEl = root.querySelector('#ux-side-dropdown');
-  if (sideLabel && sideDropdownEl) {
-    const activeSideOpt = sideDropdownEl.querySelector(`.ux-csel-option[data-value="${currentSide}"]`);
-    if (activeSideOpt) {
-      sideLabel.textContent = activeSideOpt.textContent;
-      sideDropdownEl.querySelectorAll('.ux-csel-option').forEach(o => o.classList.remove('ux-csel-active'));
-      activeSideOpt.classList.add('ux-csel-active');
+  // Update header buttons state
+  const isFloating = settings.floating === true;
+  const isLocked = settings.position_locked === true;
+
+  const dockBtn = root.querySelector('#ux-btn-dock');
+  if (dockBtn) {
+    const popoutIcon = dockBtn.querySelector('.ux-icon-popout');
+    const dockIcon = dockBtn.querySelector('.ux-icon-dock');
+    if (isFloating) {
+      dockBtn.setAttribute('data-tooltip', 'Dock to sidebar');
+      if (popoutIcon) popoutIcon.style.display = 'none';
+      if (dockIcon) dockIcon.style.display = 'block';
+    } else {
+      dockBtn.setAttribute('data-tooltip', 'Pop out to floating panel');
+      if (popoutIcon) popoutIcon.style.display = 'block';
+      if (dockIcon) dockIcon.style.display = 'none';
     }
   }
+
+  const lockBtn = root.querySelector('#ux-btn-lock');
+  if (lockBtn) {
+    lockBtn.style.display = isFloating ? 'flex' : 'none';
+    const openIcon = lockBtn.querySelector('.ux-icon-lock-open');
+    const closedIcon = lockBtn.querySelector('.ux-icon-lock-closed');
+    if (isLocked) {
+      lockBtn.setAttribute('data-tooltip', 'Unlock position');
+      lockBtn.classList.add('ux-active');
+      if (openIcon) openIcon.style.display = 'none';
+      if (closedIcon) closedIcon.style.display = 'block';
+    } else {
+      lockBtn.setAttribute('data-tooltip', 'Lock position');
+      lockBtn.classList.remove('ux-active');
+      if (openIcon) openIcon.style.display = 'block';
+      if (closedIcon) closedIcon.style.display = 'none';
+    }
+  }
+
+  // Update cursor styling on dragging layout (adds .ux-locked class to root)
+  if (isFloating && isLocked) {
+    root.classList.add('ux-locked');
+  } else {
+    root.classList.remove('ux-locked');
+  }
+
+  // Update settings visual panel mode switcher buttons active states
+  const modeSwitcher = root.querySelector('.ux-mode-switcher');
+  if (modeSwitcher) {
+    const currentMode = isFloating ? 'floating' : 'docked';
+    modeSwitcher.querySelectorAll('.ux-mode-btn').forEach(btn => {
+      if (btn.dataset.value === currentMode) {
+        btn.classList.add('ux-active');
+      } else {
+        btn.classList.remove('ux-active');
+      }
+    });
+  }
+
   // Update custom timezone dropdown label
   const currentTz = settings.timezone || 'auto';
   const tzLabel = root.querySelector('#ux-tz-label');
@@ -1622,16 +1668,9 @@ async function updateUI() {
       activeOpt.classList.add('ux-csel-active');
     }
   }
-  if (floatToggle) floatToggle.checked = settings.floating === true;
 
-  const isFloating = settings.floating === true;
   const isOpacityEnabled = settings.floating_opacity_enabled !== false;
   const opacityVal = settings.floating_opacity != null ? settings.floating_opacity : 0.85;
-
-  const sidebarSideRow = root.querySelector('#ux-sidebar-side-row');
-  if (sidebarSideRow) {
-    sidebarSideRow.style.display = isFloating ? 'none' : 'flex';
-  }
 
   const opacityCheckboxRow = root.querySelector('#ux-opacity-checkbox-row');
   if (opacityCheckboxRow) {
@@ -2197,37 +2236,81 @@ function bindEvents() {
     await saveSettings({ floating_opacity: val });
   });
 
-  // Custom sidebar side dropdown
-  const sideBtn = root.querySelector('#ux-side-btn');
-  const sideDrop = root.querySelector('#ux-side-dropdown');
-  const sideWrap = root.querySelector('#ux-side-select');
-  if (sideBtn && sideDrop && sideWrap) {
-    sideBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      root.querySelector('#ux-tz-select')?.classList.remove('ux-csel-open');
-      sideWrap.classList.toggle('ux-csel-open');
+  // Helpers for switching position modes
+  const floatPanel = async () => {
+    const s = await getSettings();
+    let fx = s.float_x;
+    let fy = s.float_y;
+    if (fx == null || fy == null) {
+      const w = root.offsetWidth || 250;
+      const h = root.offsetHeight || 200;
+      fx = Math.max(20, window.innerWidth - w - 20);
+      fy = Math.max(20, window.innerHeight - h - 20);
+    }
+    await saveSettings({
+      floating: true,
+      float_x: fx,
+      float_y: fy
     });
-    sideDrop.addEventListener('click', async (e) => {
-      const opt = e.target.closest('.ux-csel-option');
-      if (!opt) return;
-      const side = opt.dataset.value;
-      await saveSettings({ sidebar_side: side });
-      sideWrap.classList.remove('ux-csel-open');
+    root.style.left = fx + 'px';
+    root.style.top = fy + 'px';
+    root.classList.add('ux-floating');
+    document.body.appendChild(root); // moves node - no clone
+    setupSidebarResizeObserver(root);
+    updateUI().catch(() => { });
+  };
+
+  const pinPanelToSidebar = async () => {
+    await saveSettings({ floating: false, position_locked: false });
+    root.classList.remove('ux-floating');
+    root.style.left = '';
+    root.style.top = '';
+    const sidebar = findInjectTarget();
+    const userProfile = sidebar ? findUserProfileEl(sidebar) : null;
+    if (sidebar && userProfile) {
+      sidebar.insertBefore(root, userProfile);
+    } else if (sidebar) {
+      sidebar.appendChild(root);
+    }
+    setupSidebarResizeObserver(root);
+    updateUI().catch(() => { });
+  };
+
+  // Header quick lock position button
+  const lockBtn = root.querySelector('#ux-btn-lock');
+  if (lockBtn) {
+    lockBtn.addEventListener('click', async () => {
       const s = await getSettings();
-      if (!s.floating) {
-        if (side === 'right') {
-          root.classList.add('ux-side-right');
-        } else {
-          root.classList.remove('ux-side-right');
-        }
-        setupSidebarResizeObserver(root);
-      }
+      const newLocked = !s.position_locked;
+      await saveSettings({ position_locked: newLocked });
       updateUI().catch(() => { });
     });
-    document.addEventListener('click', (e) => {
-      if (!sideWrap.contains(e.target)) sideWrap.classList.remove('ux-csel-open');
+  }
+
+  // Header quick pop-out/pin toggle button
+  const dockBtn = root.querySelector('#ux-btn-dock');
+  if (dockBtn) {
+    dockBtn.addEventListener('click', async () => {
+      const s = await getSettings();
+      if (s.floating) {
+        await pinPanelToSidebar();
+      } else {
+        await floatPanel();
+      }
     });
   }
+
+  // Settings Panel Mode Switcher buttons
+  root.querySelectorAll('.ux-mode-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const value = btn.dataset.value;
+      if (value === 'floating') {
+        await floatPanel();
+      } else {
+        await pinPanelToSidebar();
+      }
+    });
+  });
 
   // Custom timezone dropdown
   const tzBtn = root.querySelector('#ux-tz-btn');
@@ -2236,7 +2319,6 @@ function bindEvents() {
   if (tzBtn && tzDrop && tzWrap) {
     tzBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      root.querySelector('#ux-side-select')?.classList.remove('ux-csel-open');
       tzWrap.classList.toggle('ux-csel-open');
     });
     tzDrop.addEventListener('click', async (e) => {
@@ -2250,43 +2332,6 @@ function bindEvents() {
       if (!tzWrap.contains(e.target)) tzWrap.classList.remove('ux-csel-open');
     });
   }
-
-  // Float toggle — move DOM node, never destroy+recreate
-  root.querySelector('#ux-setting-float')?.addEventListener('change', async (e) => {
-    const enable = e.target.checked;
-    await saveSettings({ floating: enable });
-    if (enable) {
-      // Move from sidebar into body as floating panel
-      const s = await getSettings();
-      const fx = s.float_x != null ? s.float_x : window.innerWidth - 266;
-      const fy = s.float_y != null ? s.float_y : window.innerHeight - 200;
-      root.style.left = fx + 'px';
-      root.style.top = fy + 'px';
-      root.classList.add('ux-floating');
-      root.classList.remove('ux-side-right'); // Clean up sidebar side classes when entering float mode
-      document.body.appendChild(root); // moves node — no clone
-    } else {
-      // Move back into sidebar
-      root.classList.remove('ux-floating');
-      root.style.left = '';
-      root.style.top = '';
-      const s = await getSettings();
-      if (s.sidebar_side === 'right') {
-        root.classList.add('ux-side-right');
-      } else {
-        root.classList.remove('ux-side-right');
-      }
-      const sidebar = findInjectTarget();
-      const userProfile = sidebar ? findUserProfileEl(sidebar) : null;
-      if (sidebar && userProfile) {
-        sidebar.insertBefore(root, userProfile);
-      } else if (sidebar) {
-        sidebar.appendChild(root);
-      }
-    }
-    setupSidebarResizeObserver(root);
-    updateUI().catch(() => { });
-  });
 
   root.querySelector('#ux-btn-reset')?.addEventListener('click', async () => {
     const res = await browser.storage.local.get('settings');
@@ -2340,6 +2385,7 @@ function bindEvents() {
     handles.forEach(handle => {
       handle.addEventListener('mousedown', (e) => {
         if (!root.classList.contains('ux-floating')) return;
+        if (root.classList.contains('ux-locked')) return;
         // Avoid dragging when clicking buttons, selects, inputs, or links within the header
         if (e.target.closest('button, select, input, a')) return;
         dragging = true;
@@ -2368,6 +2414,7 @@ function bindEvents() {
       const nx = parseFloat(root.style.left);
       const ny = parseFloat(root.style.top);
       await saveSettings({ float_x: nx, float_y: ny });
+      updateUI().catch(() => { });
     };
 
     document.addEventListener('mousemove', dragMoveHandler);
@@ -2515,6 +2562,29 @@ function getSidebarHTML() {
             <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
           </svg>
         </button>
+        <button class="ux-icn" id="ux-btn-lock" aria-label="Lock Position" data-tooltip="Lock position" style="display: none;">
+          <svg class="ux-icon-lock-open" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="17" x2="12" y2="22"/>
+            <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.48A2 2 0 0 1 15 9.28V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.28a2 2 0 0 1-.78 1.24l-2.78 3.48A2 2 0 0 0 5 15.24z"/>
+          </svg>
+          <svg class="ux-icon-lock-closed" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+            <line x1="12" y1="17" x2="12" y2="22"/>
+            <path d="M5 17h14v-1.76a2 2 0 0 0-.44-1.24l-2.78-3.48A2 2 0 0 1 15 9.28V5a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v4.28a2 2 0 0 1-.78 1.24l-2.78 3.48A2 2 0 0 0 5 15.24z"/>
+          </svg>
+        </button>
+        <button class="ux-icn" id="ux-btn-dock" aria-label="Toggle Position" data-tooltip="Pop out to floating panel">
+          <svg class="ux-icon-popout" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <polyline points="15 3 21 3 21 9"/>
+            <line x1="10" y1="14" x2="21" y2="3"/>
+          </svg>
+          <svg class="ux-icon-dock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+            <path d="M16 16l-4-4 4-4"/>
+            <line x1="12" y1="12" x2="18" y2="12"/>
+          </svg>
+        </button>
         <button class="ux-icn" id="ux-btn-minimize" aria-label="Minimize" data-tooltip="Minimize (Alt+U)">
           <svg class="ux-icon-minimize" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <line x1="5" y1="12" x2="19" y2="12"/>
@@ -2612,12 +2682,24 @@ function getSidebarHTML() {
       <div class="ux-settings-section">
         <div class="ux-settings-section-title">Appearance & Layout</div>
         
-        <div class="ux-setting-row">
-          <span class="ux-setting-label">Float panel</span>
-          <label class="ux-toggle">
-            <input type="checkbox" id="ux-setting-float">
-            <span class="ux-toggle-track"></span>
-          </label>
+        <div class="ux-setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+          <span class="ux-setting-label">Panel Mode</span>
+          <div class="ux-mode-switcher">
+            <button class="ux-mode-btn" data-value="docked" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/>
+                <line x1="9" y1="3" x2="9" y2="21"/>
+              </svg>
+              <span>Sidebar</span>
+            </button>
+            <button class="ux-mode-btn" data-value="floating" type="button">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
+                <rect x="7" y="9" width="10" height="6" rx="1"/>
+              </svg>
+              <span>Floating</span>
+            </button>
+          </div>
         </div>
         
         <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-checkbox-row" style="display: none;">
@@ -2642,20 +2724,6 @@ function getSidebarHTML() {
             <input type="checkbox" id="ux-setting-resize">
             <span class="ux-toggle-track"></span>
           </label>
-        </div>
-        
-        <div class="ux-setting-row" id="ux-sidebar-side-row">
-          <span class="ux-setting-label">Sidebar side</span>
-          <div class="ux-csel" id="ux-side-select">
-            <button class="ux-csel-btn" id="ux-side-btn" type="button">
-              <span id="ux-side-label">Left</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <div class="ux-csel-dropdown" id="ux-side-dropdown">
-              <div class="ux-csel-option ux-csel-active" data-value="left">Left</div>
-              <div class="ux-csel-option" data-value="right">Right</div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -2922,20 +2990,6 @@ function getCSS() {
 #usagex-v2-root.ux-floating .ux-settings-header { cursor: grab; }
 #usagex-v2-root.ux-floating #ux-drag-handle:active,
 #usagex-v2-root.ux-floating .ux-settings-header:active { cursor: grabbing; }
-#usagex-v2-root.ux-side-right {
-  position: fixed;
-  bottom: 28px;
-  right: 18px;
-  z-index: 99999;
-  width: 250px;
-  border-top: none;
-  border-radius: 12px;
-  background: #222222;
-  box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5),
-              0 8px 10px -6px rgba(0,0,0,0.5),
-              inset 0 1px 1px 0 rgba(255,255,255,0.1);
-  border: 1px solid rgba(255,255,255,0.08);
-}
 #usagex-v2-root.ux-minimized #ux-bars-section,
 #usagex-v2-root.ux-minimized #ux-peak-strip-wrap,
 #usagex-v2-root.ux-minimized #ux-effort-section { display: none; }
@@ -3410,6 +3464,60 @@ function getCSS() {
   bottom: 6px;
   right: 6px;
 }
+.ux-mode-switcher {
+  display: flex;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--ux-border-subtle);
+  border-radius: 8px;
+  padding: 3px;
+  width: 100%;
+  max-width: 200px;
+  margin-top: 4px;
+  box-sizing: border-box;
+}
+.ux-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ux-text-3);
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+}
+.ux-mode-btn:hover {
+  color: var(--ux-text-2);
+  background: rgba(255, 255, 255, 0.03);
+}
+.ux-mode-btn.ux-active {
+  background: rgba(240, 165, 0, 0.08);
+  border-color: rgba(240, 165, 0, 0.25);
+  color: #f0a500;
+}
+.ux-mode-btn svg {
+  flex-shrink: 0;
+}
+#ux-btn-lock.ux-active {
+  color: #f0a500 !important;
+  background: rgba(240, 165, 0, 0.08) !important;
+  border-color: rgba(240, 165, 0, 0.25) !important;
+}
+#usagex-v2-root.ux-locked #ux-drag-handle,
+#usagex-v2-root.ux-locked .ux-settings-header {
+  cursor: default !important;
+}
+#usagex-v2-root.ux-locked #ux-drag-handle:active,
+#usagex-v2-root.ux-locked .ux-settings-header:active {
+  cursor: default !important;
+}
+
 .ux-shortcut-footer {
   margin-top: 16px;
   font-size: 11px;
