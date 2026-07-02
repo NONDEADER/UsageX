@@ -494,26 +494,33 @@ windowMsgHandler = (event) => {
     onConversationHistory(event.data.data, event.data.convoId || null, event.data.convoName || null, event.data.modelId || null, event.data.thinkingMode || null).catch(() => { });
   } else if (event.data.type === '__ux_user_info') {
     (async () => {
+      const uuid = event.data.uuid;
       const email = event.data.email;
       const name = event.data.name;
       const plan = event.data.plan;
-      if (!email && !name && !plan) return;
-      const storage = typeof browser !== "undefined" ? browser.storage : chrome.storage;
-      const res = await storage.local.get(['active_account_id', 'user_email', 'user_name', 'user_plan']);
-      const currentActive = res.active_account_id;
-      const updates = {};
-      if (email && res.user_email !== email) updates.user_email = email;
-      if (name && res.user_name !== name) updates.user_name = name;
-      if (plan && res.user_plan !== plan) updates.user_plan = plan;
-      if (currentActive) {
-        if (email) updates[`user_email_${currentActive}`] = email;
-        if (name) updates[`user_name_${currentActive}`] = name;
-        if (plan) updates[`user_plan_${currentActive}`] = plan;
+      if (!uuid && !email && !name && !plan) return;
+
+      // Route through handleUserInfo so account switches are properly detected.
+      // This compares the incoming uuid/email against active_account_id and
+      // calls switchAccount() if they differ — clearing stale stats from the
+      // previous account and restoring the new account's data.
+      if (uuid || email) {
+        await handleUserInfo(uuid, email, name);
       }
-      if (Object.keys(updates).length > 0) {
-        await storage.local.set(updates);
-        if (typeof updateUI === 'function') {
-          await updateUI();
+
+      // Update the plan separately (handleUserInfo doesn't cover plan).
+      if (plan) {
+        const storage = typeof browser !== "undefined" ? browser.storage : chrome.storage;
+        const res = await storage.local.get(['active_account_id', 'user_plan']);
+        const currentActive = res.active_account_id;
+        const updates = {};
+        if (res.user_plan !== plan) updates.user_plan = plan;
+        if (currentActive) updates[`user_plan_${currentActive}`] = plan;
+        if (Object.keys(updates).length > 0) {
+          await storage.local.set(updates);
+          if (typeof updateUI === 'function') {
+            await updateUI();
+          }
         }
       }
     })().catch(() => { });
