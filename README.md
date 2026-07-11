@@ -5,7 +5,7 @@
 
 ![UsageX v2 — sidebar panel injected into Claude.ai alongside the floating popup dashboard](assets/hero-banner.png)
 
-> A Firefox (Manifest V3) extension that tracks your **Claude.ai** usage and renders a live stats panel directly on the page — no external server, no third-party libraries, no build step required.
+> A Firefox (Manifest V3) extension that tracks your **Claude.ai** usage and renders a live stats panel directly on the page — no third-party libraries, no build step required. All data is stored locally; the only outbound network call is the optional, user-initiated feedback form.
 
 ---
 
@@ -184,7 +184,7 @@ The established MV3 pattern for this is:
 
 For step 1 to work, `inject.js` must be listed in `web_accessible_resources` so the browser permits its URL to be loaded as a page script. All `postMessage` messages are validated with a shared secret and a strict origin allowlist (`https://claude.ai` only) before being acted upon.
 
-The other resources listed (`popup.html/css/js`, `debug-viewer.*`, `permissions.*`) are opened via `browser.runtime.getURL` from within the extension context and therefore also require `web_accessible_resources` entries.
+The other resources listed (`popup.html/css/js`, `debug-viewer.*`) are opened via `window.open(browser.runtime.getURL(...))` from the content script context and therefore also require `web_accessible_resources` entries. `permissions.html/js` are **not** in `web_accessible_resources` — they are opened exclusively via `browser.tabs.create` from `background.js` (an extension context) which does not require web accessibility.
 
 ### What is stored in `recent_sent_prompts`?
 

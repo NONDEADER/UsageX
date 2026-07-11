@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UsageX v2",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Track Claude.ai usage stats — session %, weekly %, effort breakdown, and more.",
   "permissions": [
     "storage",
@@ -49,9 +49,7 @@
         "inject.js",
         "popup.html",
         "popup.css",
-        "popup.js",
-        "permissions.html",
-        "permissions.js"
+        "popup.js"
       ],
       "matches": [
         "https://claude.ai/*",

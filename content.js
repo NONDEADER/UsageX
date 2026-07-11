@@ -2346,9 +2346,8 @@ function bindEvents() {
         let granted = false;
         try {
           granted = await browser.permissions.contains({ origins });
-        } catch (pe) {
-          console.warn('[UsageX] Permissions query warning:', pe);
-          granted = true; // Fallback to let fetch try
+        } catch (_pe) {
+          granted = true; // Fallback: permission already granted via host_permissions
         }
 
         if (!granted) {
