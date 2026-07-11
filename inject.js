@@ -243,19 +243,7 @@
                 }
               }, '*');
             }
-            if (url.includes('/completion') || url.includes('/sync/') || url.includes('/chat_conversations')) {
-              const found = [];
-              for (const k in json) {
-                if (/limit|usage|rate|remaining|reset|hour|pct|util/i.test(k)) {
-                  found.push(k + ':' + JSON.stringify(json[k]).slice(0, 100));
-                }
-                if (json[k] && typeof json[k] === 'object' && (json[k].resets_at || json[k].utilization || json[k].remaining)) {
-                  found.push(k + ':{resets_at,utilization}');
-                }
-              }
-              const topKeys = Object.keys(json).join(', ');
-              if (found.length) console.log('[UsageX]', url.split('/').pop(), '→ keys:', topKeys, '| usage:', found.join(' | '));
-            }
+
           } catch(_) {}
         }).catch(function() {});
       }

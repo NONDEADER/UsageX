@@ -82,8 +82,9 @@ Or load it as a temporary add-on from source:
 | Permission | Why |
 |---|---|
 | `storage` | Saves today's stats, 30-day history, and settings locally |
-| `alarms` | Schedules a midnight reset to roll over daily counters |
-| `activeTab` | Required by MV3 for the content-script host permission |
+| `alarms` | Schedules reset-approaching and reset notifications via `browser.alarms` |
+| `tabs` | Opens the debug viewer and help popup in a new tab when the sidebar button is clicked |
+| `notifications` | Shows browser-native reset alerts (only when explicitly enabled by the user in Settings) |
 | `host_permissions: claude.ai` | Allows the content script and fetch hook to run on Claude |
 
 ---
@@ -109,6 +110,32 @@ Open the ⚙ panel from the sidebar header to access:
 
 ---
 
+---
+
 ## License
 
 MIT
+
+---
+
+## AMO Review Notes
+
+This section is intended for Mozilla reviewers.
+
+### Why is `inject.js` in `web_accessible_resources`?
+
+The extension intercepts Claude's `window.fetch` calls to read usage-limit data from API responses. This requires running code in the **MAIN world** (the page's own JavaScript context), not the isolated content-script world, so that the overridden `fetch` shares the same `window` object as Claude's own code.
+
+The established MV3 pattern for this is:
+1. `inject-loader.js` (content script, isolated world) appends a `<script src="inject.js">` tag to the page.
+2. `inject.js` (MAIN world) overrides `window.fetch`, reads the response body, and forwards only the relevant numeric fields (`utilization`, `resets_at`) back to the content script via `window.postMessage`.
+
+For step 1 to work, `inject.js` must be listed in `web_accessible_resources` so the browser permits its URL to be loaded as a page script. All `postMessage` messages are validated with a shared secret and a strict origin allowlist (`https://claude.ai` only) before being acted upon.
+
+### What is stored in `recent_sent_prompts`?
+
+`recent_sent_prompts` contains a rolling window of **djb2 hashes** (32-bit unsigned integers encoded as base-36 strings) of the user's outgoing message text. The hashes are one-way — the original text cannot be recovered from them. They are stored locally in `browser.storage.local` and used exclusively to prevent double-counting when the conversation-history sync replays messages that were already counted in real-time. No message text, summary, or personally identifiable information is stored or transmitted.
+
+### Debug Viewer (`debug-viewer.html`)
+
+The debug viewer is an internal diagnostic page opened from the extension sidebar or popup (via `browser.runtime.getURL`). It reads verbose event logs from `browser.storage.local` only when the user has explicitly enabled **Debug logging** in Settings. Debug logging is off by default and the log store is cleared by the user from within the viewer. No data leaves the device.

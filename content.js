@@ -106,7 +106,6 @@ window.__usagex_cleanup = () => {
     peakHoursState: null,
     peakHoursApproaching: false
   };
-  console.log('[UsageX] Cleaned up previous script instance.');
 };
 
 // ─── Storage ───────────────────────────────────────────────────────────────────
@@ -446,7 +445,6 @@ async function handleUserInfo(uuid, email, name) {
     return;
   }
 
-  console.log('[UsageX] Account switch detected from', currentActive, 'to', accountId);
 
   if (email || name) {
     const targetArchive = {};
@@ -561,6 +559,11 @@ browser.storage.onChanged.addListener(storageOnChangedHandler);
 // djb2 hash over the full message text — avoids the false-positive collisions
 // that the old length+prefix fingerprint caused when two different messages
 // shared the same length and first 50 characters.
+//
+// PRIVACY NOTE: Only this 32-bit hash (stored as a base-36 string) is ever
+// persisted under `recent_sent_prompts`. The original message text is never
+// stored or transmitted. The hash is one-way and is used exclusively to
+// prevent double-counting when the conversation history sync runs.
 function hashPrompt(text) {
   if (!text) return '';
   const cleaned = text.trim();
@@ -1852,6 +1855,9 @@ async function updateUI() {
       modelEntries.push([lastModel, 0]);
     }
     if (modelEntries.length > 0) {
+      // Safe: modelDisplayName() is a pure whitelist that returns only
+      // hardcoded static strings (e.g. 'Sonnet 4.6') or null — no
+      // user-controlled or API-sourced text is ever interpolated here.
       modelPillsRow.innerHTML = modelEntries
         .sort((a, b) => b[1] - a[1])
         .map(([mid]) => {

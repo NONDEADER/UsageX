@@ -490,6 +490,8 @@ async function refreshDashboard() {
     }
 
     if (modelEntries.length > 0) {
+      // Safe: modelDisplayName() is a pure whitelist returning only
+      // hardcoded static strings or null — no user/API text interpolated.
       modelPillsRow.innerHTML = modelEntries
         .sort((a, b) => b[1] - a[1])
         .map(([mid]) => {
