@@ -176,6 +176,7 @@ function freshToday(ianaTz) {
 
 function defaultSettings() {
   return {
+    simple_mode: true,
     debug_logging: false,
     sidebar_side: 'left',
     timezone: 'auto',
@@ -1793,6 +1794,24 @@ async function updateUI() {
       root.style.width = '';
     }
   }
+
+  // ── Simple Mode & Nudge ──
+  const simpleMode = settings.simple_mode !== false;
+  const nudgeEl = root.querySelector('#ux-nudge-advanced');
+  if (nudgeEl) {
+    nudgeEl.style.display = simpleMode ? 'block' : 'none';
+  }
+
+  const peakStrip = root.querySelector('#ux-peak-strip-wrap');
+  if (peakStrip) {
+    peakStrip.style.display = simpleMode ? 'none' : '';
+  }
+
+  const simpleModeToggle = root.querySelector('#ux-setting-simple-mode');
+  if (simpleModeToggle) {
+    simpleModeToggle.checked = simpleMode;
+  }
+
   // ── Effort pills ──
   const lastModel = today.last_model || null;
   const supportsEffortLevel = lastModel ? modelSupportsEffortLevel(lastModel) : false;
@@ -1803,10 +1822,10 @@ async function updateUI() {
   const eb = today.effort_breakdown || { low: 0, medium: 0, high: 0, max: 0 };
 
   if (effortSec) {
-    effortSec.style.display = supportsExtended ? '' : 'none';
+    effortSec.style.display = (supportsExtended && !simpleMode) ? '' : 'none';
     const pillsWrap = root.querySelector('.ux-effort-pills');
     if (pillsWrap) {
-      pillsWrap.style.display = supportsEffortLevel ? '' : 'none';
+      pillsWrap.style.display = (supportsEffortLevel && !simpleMode) ? '' : 'none';
     }
     const epPairs = [
       ['low', '#ux-ep-low', '#ux-epc-low'],
@@ -1818,7 +1837,7 @@ async function updateUI() {
       const cnt = eb[key] || 0;
       const pillEl = root.querySelector(pillSel);
       const countEl = root.querySelector(countSel);
-      if (pillEl) pillEl.style.display = (supportsEffortLevel && cnt > 0) ? '' : 'none';
+      if (pillEl) pillEl.style.display = (supportsEffortLevel && !simpleMode && cnt > 0) ? '' : 'none';
       if (countEl) countEl.textContent = String(cnt);
     }
   }
@@ -2196,6 +2215,48 @@ function bindEvents() {
   // Settings back → main view
   root.querySelector('#ux-settings-back-btn')?.addEventListener('click', () => {
     root.classList.remove('ux-settings-open');
+  });
+
+  // Advanced User Nudge Toggle
+  root.querySelector('#ux-nudge-toggle-btn')?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    await saveSettings({ simple_mode: false });
+    updateUI().catch(() => { });
+  });
+
+  // Simple Mode Toggle Checkbox
+  root.querySelector('#ux-setting-simple-mode')?.addEventListener('change', async (e) => {
+    await saveSettings({ simple_mode: e.target.checked });
+    updateUI().catch(() => { });
+  });
+
+  // Settings Tab Switching
+  root.querySelectorAll('.ux-settings-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      const tabName = tab.dataset.tab;
+      root.querySelectorAll('.ux-settings-tab').forEach(t => {
+        t.classList.remove('ux-settings-tab-active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('ux-settings-tab-active');
+      tab.setAttribute('aria-selected', 'true');
+
+      root.querySelectorAll('.ux-settings-tab-panel').forEach(panel => {
+        if (panel.id === `ux-tab-panel-${tabName}`) {
+          panel.style.display = 'flex';
+        } else {
+          panel.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Generic Collapsible Settings Sections
+  root.querySelectorAll('.ux-collapsible-section').forEach(sec => {
+    const header = sec.querySelector('.ux-section-header');
+    header?.addEventListener('click', () => {
+      sec.classList.toggle('ux-section-collapsed');
+    });
   });
 
   root.querySelector('#ux-btn-export')?.addEventListener('click', async () => {
@@ -2677,6 +2738,10 @@ function getSidebarHTML() {
       </div>
     </div>
 
+    <div id="ux-nudge-advanced" style="display:none">
+      Advanced user? <a href="#" id="ux-nudge-toggle-btn">Enable detailed stats &#8594;</a>
+    </div>
+
     <div id="ux-peak-strip-wrap">
       <div class="ux-bar-top">
         <span class="ux-bar-label">Peak hours</span>
@@ -2739,198 +2804,207 @@ function getSidebarHTML() {
       <span class="ux-settings-title">Settings</span>
     </div>
 
+    <div class="ux-settings-tabs" role="tablist">
+      <button class="ux-settings-tab ux-settings-tab-active" data-tab="general" role="tab" aria-selected="true" type="button">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="6" r="2" fill="currentColor" stroke="none"/><circle cx="16" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="10" cy="18" r="2" fill="currentColor" stroke="none"/></svg>
+        General
+      </button>
+      <button class="ux-settings-tab" data-tab="alerts" role="tab" aria-selected="false" type="button">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alerts
+      </button>
+      <button class="ux-settings-tab" data-tab="system" role="tab" aria-selected="false" type="button">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        System
+      </button>
+    </div>
+
     <div class="ux-settings-content">
-      <div class="ux-settings-section">
-        <div class="ux-settings-section-title">Appearance & Layout</div>
-        
-        <div class="ux-setting-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
-          <span class="ux-setting-label">Panel Mode</span>
-          <div class="ux-mode-switcher">
-            <button class="ux-mode-btn" data-value="docked" type="button">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                <line x1="9" y1="3" x2="9" y2="21"/>
-              </svg>
-              <span>Sidebar</span>
-            </button>
-            <button class="ux-mode-btn" data-value="floating" type="button">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/>
-                <rect x="7" y="9" width="10" height="6" rx="1"/>
-              </svg>
-              <span>Floating</span>
-            </button>
-          </div>
-        </div>
-        
-        <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-checkbox-row" style="display: none;">
-          <span class="ux-setting-label">Fade when inactive</span>
-          <label class="ux-toggle">
-            <input type="checkbox" id="ux-setting-floating-opacity-enabled">
-            <span class="ux-toggle-track"></span>
-          </label>
-        </div>
-        
-        <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-slider-row" style="display: none;">
-          <span class="ux-setting-label">Opacity level</span>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="range" id="ux-setting-opacity-slider" min="10" max="100" step="5" class="ux-range-slider" style="width: 80px;">
-            <span id="ux-opacity-val" style="font-size: 11.5px; color: var(--ux-text-2); min-width: 28px; text-align: right;">85%</span>
-          </div>
-        </div>
-        
-        <div class="ux-setting-row ux-setting-row-sub" id="ux-resize-row" style="display: none;">
-          <span class="ux-setting-label">Enable resizing</span>
-          <label class="ux-toggle">
-            <input type="checkbox" id="ux-setting-resize">
-            <span class="ux-toggle-track"></span>
-          </label>
-        </div>
-      </div>
+      <!-- PANEL: General -->
+      <div class="ux-settings-tab-panel" id="ux-tab-panel-general" role="tabpanel">
 
-      <div class="ux-settings-section">
-        <div class="ux-settings-section-title">Regional Settings</div>
-        <div class="ux-setting-row">
-          <span class="ux-setting-label">Timezone</span>
-          <div class="ux-csel" id="ux-tz-select">
-            <button class="ux-csel-btn" id="ux-tz-btn" type="button">
-              <span id="ux-tz-label">Auto-detect</span>
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        <div class="ux-settings-section ux-collapsible-section" id="ux-section-appearance">
+          <div class="ux-section-header">
+            <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;">Appearance &amp; Layout</div>
+            <button class="ux-section-toggle-btn" type="button" aria-label="Toggle section">
+              <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
-            <div class="ux-csel-dropdown" id="ux-tz-dropdown">
-              <div class="ux-csel-option ux-csel-active" data-value="auto">Auto-detect</div>
-              <div class="ux-csel-group">Americas</div>
-              <div class="ux-csel-option" data-value="HST">HST (UTC−10)</div>
-              <div class="ux-csel-option" data-value="AKST">AKST (UTC−9)</div>
-              <div class="ux-csel-option" data-value="PST">PST (UTC−8)</div>
-              <div class="ux-csel-option" data-value="MST">MST (UTC−7)</div>
-              <div class="ux-csel-option" data-value="CST">CST (UTC−6)</div>
-              <div class="ux-csel-option" data-value="EST">EST (UTC−5)</div>
-              <div class="ux-csel-option" data-value="AST">AST (UTC−4)</div>
-              <div class="ux-csel-option" data-value="BRT">BRT (UTC−3)</div>
-              <div class="ux-csel-group">Europe & Africa</div>
-              <div class="ux-csel-option" data-value="GMT">GMT (UTC+0)</div>
-              <div class="ux-csel-option" data-value="CET">CET (UTC+1)</div>
-              <div class="ux-csel-option" data-value="EET">EET (UTC+2)</div>
-              <div class="ux-csel-option" data-value="MSK">MSK (UTC+3)</div>
-              <div class="ux-csel-group">Middle East & Asia</div>
-              <div class="ux-csel-option" data-value="GST">GST (UTC+4)</div>
-              <div class="ux-csel-option" data-value="PKT">PKT (UTC+5)</div>
-              <div class="ux-csel-option" data-value="IST">IST (UTC+5:30)</div>
-              <div class="ux-csel-option" data-value="NPT">NPT (UTC+5:45)</div>
-              <div class="ux-csel-option" data-value="BST">BST (UTC+6)</div>
-              <div class="ux-csel-option" data-value="ICT">ICT (UTC+7)</div>
-              <div class="ux-csel-option" data-value="CST-Asia">CST (UTC+8)</div>
-              <div class="ux-csel-option" data-value="SGT">SGT (UTC+8)</div>
-              <div class="ux-csel-option" data-value="JST">JST (UTC+9)</div>
-              <div class="ux-csel-option" data-value="KST">KST (UTC+9)</div>
-              <div class="ux-csel-group">Oceania</div>
-              <div class="ux-csel-option" data-value="ACST">ACST (UTC+9:30)</div>
-              <div class="ux-csel-option" data-value="AEST">AEST (UTC+10)</div>
-              <div class="ux-csel-option" data-value="NZST">NZST (UTC+12)</div>
+          </div>
+          <div class="ux-section-body">
+            <div class="ux-setting-row" style="margin-top:8px;">
+              <span class="ux-setting-label">Simple UI</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-simple-mode"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row" style="flex-direction:column;align-items:flex-start;gap:8px;margin-top:8px;">
+              <span class="ux-setting-label">Panel Mode</span>
+              <div class="ux-mode-switcher">
+                <button class="ux-mode-btn" data-value="docked" type="button">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                  <span>Sidebar</span>
+                </button>
+                <button class="ux-mode-btn" data-value="floating" type="button">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2z"/><rect x="7" y="9" width="10" height="6" rx="1"/></svg>
+                  <span>Floating</span>
+                </button>
+              </div>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-checkbox-row" style="display:none;margin-top:8px;">
+              <span class="ux-setting-label">Fade when inactive</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-floating-opacity-enabled"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-opacity-slider-row" style="display:none;margin-top:8px;">
+              <span class="ux-setting-label">Opacity level</span>
+              <div style="display:flex;align-items:center;gap:8px;"><input type="range" id="ux-setting-opacity-slider" min="10" max="100" step="5" class="ux-range-slider" style="width:80px;"><span id="ux-opacity-val" style="font-size:11.5px;color:var(--ux-text-2);min-width:28px;text-align:right;">85%</span></div>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-resize-row" style="display:none;margin-top:8px;">
+              <span class="ux-setting-label">Enable resizing</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-resize"><span class="ux-toggle-track"></span></label>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="ux-settings-section ux-collapsible-section ux-section-collapsed" id="ux-section-notifications">
-        <div class="ux-section-header" id="ux-notifications-header">
-          <div class="ux-settings-section-title" style="margin: 0; padding-bottom: 0;">Notifications</div>
-          <button class="ux-section-toggle-btn" id="ux-notifications-toggle-btn" type="button" aria-label="Toggle notifications section">
-            <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </button>
-        </div>
-        
-        <div class="ux-section-body" id="ux-notifications-body">
-          <div class="ux-setting-row" style="margin-top: 8px;">
-            <span class="ux-setting-label">System Notifications</span>
-            <label class="ux-toggle">
-              <input type="checkbox" id="ux-setting-notifications-browser">
-              <span class="ux-toggle-track"></span>
-            </label>
-          </div>
-          
-          <div class="ux-setting-row">
-            <span class="ux-setting-label">In-Page Toast Alerts</span>
-            <label class="ux-toggle">
-              <input type="checkbox" id="ux-setting-notifications-toast">
-              <span class="ux-toggle-track"></span>
-            </label>
-          </div>
-
-          <div class="ux-setting-row ux-setting-row-sub" id="ux-toast-position-row" style="flex-direction: column; align-items: flex-start; gap: 6px;">
-            <span class="ux-setting-label">Toast Position</span>
-            <div class="ux-toast-position-grid">
-              <button class="ux-toast-pos-btn" data-value="top-left" data-tooltip="Top Left" type="button"></button>
-              <button class="ux-toast-pos-btn" data-value="top-right" data-tooltip="Top Right" type="button"></button>
-              <button class="ux-toast-pos-btn" data-value="bottom-left" data-tooltip="Bottom Left" type="button"></button>
-              <button class="ux-toast-pos-btn" data-value="bottom-right" data-tooltip="Bottom Right" type="button"></button>
-            </div>
-          </div>
-
-          <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-limits-row">
-            <span class="ux-setting-label">Alert when limits reset</span>
-            <label class="ux-toggle">
-              <input type="checkbox" id="ux-setting-alert-limits-reset">
-              <span class="ux-toggle-track"></span>
-            </label>
-          </div>
-
-          <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-threshold-row">
-            <span class="ux-setting-label">Alert when usage exceeds 80%</span>
-            <label class="ux-toggle">
-              <input type="checkbox" id="ux-setting-alert-usage-threshold">
-              <span class="ux-toggle-track"></span>
-            </label>
-          </div>
-
-          <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-peak-row">
-            <span class="ux-setting-label">Alert during Peak Hours</span>
-            <label class="ux-toggle">
-              <input type="checkbox" id="ux-setting-alert-peak-hours">
-              <span class="ux-toggle-track"></span>
-            </label>
-          </div>
-
-          <div class="ux-setting-row" style="margin-top: 6px; border-top: 1px solid var(--ux-border-subtle); padding-top: 8px;">
-            <span class="ux-setting-label" style="color: var(--ux-text-3); font-size: 10.5px;">Preview a sample notification</span>
-            <button class="ux-settings-btn" id="ux-btn-test-toast" type="button" style="width: auto; padding: 4px 10px; font-size: 11px; flex-shrink: 0;">
-              Test Toast
+        <div class="ux-settings-section ux-collapsible-section ux-section-collapsed" id="ux-section-regional" style="margin-top:10px;">
+          <div class="ux-section-header">
+            <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;">Regional Settings</div>
+            <button class="ux-section-toggle-btn" type="button" aria-label="Toggle section">
+              <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
           </div>
+          <div class="ux-section-body">
+            <div class="ux-setting-row" style="margin-top:8px;">
+              <span class="ux-setting-label">Timezone</span>
+              <div class="ux-csel" id="ux-tz-select">
+                <button class="ux-csel-btn" id="ux-tz-btn" type="button">
+                  <span id="ux-tz-label">Auto-detect</span>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </button>
+                <div class="ux-csel-dropdown" id="ux-tz-dropdown">
+                  <div class="ux-csel-option ux-csel-active" data-value="auto">Auto-detect</div>
+                  <div class="ux-csel-group">Americas</div>
+                  <div class="ux-csel-option" data-value="HST">HST (UTC−10)</div>
+                  <div class="ux-csel-option" data-value="AKST">AKST (UTC−9)</div>
+                  <div class="ux-csel-option" data-value="PST">PST (UTC−8)</div>
+                  <div class="ux-csel-option" data-value="MST">MST (UTC−7)</div>
+                  <div class="ux-csel-option" data-value="CST">CST (UTC−6)</div>
+                  <div class="ux-csel-option" data-value="EST">EST (UTC−5)</div>
+                  <div class="ux-csel-option" data-value="AST">AST (UTC−4)</div>
+                  <div class="ux-csel-option" data-value="BRT">BRT (UTC−3)</div>
+                  <div class="ux-csel-group">Europe &amp; Africa</div>
+                  <div class="ux-csel-option" data-value="GMT">GMT (UTC+0)</div>
+                  <div class="ux-csel-option" data-value="CET">CET (UTC+1)</div>
+                  <div class="ux-csel-option" data-value="EET">EET (UTC+2)</div>
+                  <div class="ux-csel-option" data-value="MSK">MSK (UTC+3)</div>
+                  <div class="ux-csel-group">Middle East &amp; Asia</div>
+                  <div class="ux-csel-option" data-value="GST">GST (UTC+4)</div>
+                  <div class="ux-csel-option" data-value="PKT">PKT (UTC+5)</div>
+                  <div class="ux-csel-option" data-value="IST">IST (UTC+5:30)</div>
+                  <div class="ux-csel-option" data-value="NPT">NPT (UTC+5:45)</div>
+                  <div class="ux-csel-option" data-value="BST">BST (UTC+6)</div>
+                  <div class="ux-csel-option" data-value="ICT">ICT (UTC+7)</div>
+                  <div class="ux-csel-option" data-value="CST-Asia">CST (UTC+8)</div>
+                  <div class="ux-csel-option" data-value="SGT">SGT (UTC+8)</div>
+                  <div class="ux-csel-option" data-value="JST">JST (UTC+9)</div>
+                  <div class="ux-csel-option" data-value="KST">KST (UTC+9)</div>
+                  <div class="ux-csel-group">Oceania</div>
+                  <div class="ux-csel-option" data-value="ACST">ACST (UTC+9:30)</div>
+                  <div class="ux-csel-option" data-value="AEST">AEST (UTC+10)</div>
+                  <div class="ux-csel-option" data-value="NZST">NZST (UTC+12)</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <div class="ux-settings-section">
-        <div class="ux-settings-section-title">Diagnostics & Logs</div>
-        <div class="ux-setting-row">
-          <span class="ux-setting-label">Debug logging</span>
-          <label class="ux-toggle">
-            <input type="checkbox" id="ux-setting-debug">
-            <span class="ux-toggle-track"></span>
-          </label>
+      </div><!-- end general panel -->
+
+      <!-- PANEL: Alerts -->
+      <div class="ux-settings-tab-panel" id="ux-tab-panel-alerts" role="tabpanel" style="display:none;">
+        <div class="ux-settings-section ux-collapsible-section" id="ux-section-notifications">
+          <div class="ux-section-header">
+            <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;">Notifications</div>
+            <button class="ux-section-toggle-btn" type="button" aria-label="Toggle notifications section">
+              <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          <div class="ux-section-body">
+            <div class="ux-setting-row" style="margin-top:8px;">
+              <span class="ux-setting-label">System Notifications</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-notifications-browser"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row">
+              <span class="ux-setting-label">In-Page Toast Alerts</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-notifications-toast"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-toast-position-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+              <span class="ux-setting-label">Toast Position</span>
+              <div class="ux-toast-position-grid">
+                <button class="ux-toast-pos-btn" data-value="top-left" data-tooltip="Top Left" type="button"></button>
+                <button class="ux-toast-pos-btn" data-value="top-right" data-tooltip="Top Right" type="button"></button>
+                <button class="ux-toast-pos-btn" data-value="bottom-left" data-tooltip="Bottom Left" type="button"></button>
+                <button class="ux-toast-pos-btn" data-value="bottom-right" data-tooltip="Bottom Right" type="button"></button>
+              </div>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-limits-row">
+              <span class="ux-setting-label">Alert when limits reset</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-alert-limits-reset"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-threshold-row">
+              <span class="ux-setting-label">Alert when usage exceeds 80%</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-alert-usage-threshold"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row ux-setting-row-sub" id="ux-alert-peak-row">
+              <span class="ux-setting-label">Alert during Peak Hours</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-alert-peak-hours"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-setting-row" style="margin-top:6px;border-top:1px solid var(--ux-border-subtle);padding-top:8px;">
+              <span class="ux-setting-label" style="color:var(--ux-text-3);font-size:10.5px;">Preview a sample notification</span>
+              <button class="ux-settings-btn" id="ux-btn-test-toast" type="button" style="width:auto;padding:4px 10px;font-size:11px;flex-shrink:0;">Test Toast</button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
 
-    <div class="ux-settings-actions-group">
-      <div class="ux-settings-btns-row">
-        <button class="ux-settings-btn" id="ux-btn-export">
-          <span id="ux-export-label">Export JSON</span>
-          <span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span>
-        </button>
-        <button class="ux-settings-btn ux-btn-with-badge" id="ux-btn-debug">
-          <span>Debug logs</span>
-          <span class="ux-count-badge" id="ux-debug-count">0</span>
-        </button>
-      </div>
-      <div class="ux-settings-btns-row">
-        <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-reset">Reset Stats</button>
-        <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-clear-debug">Clear Logs</button>
-      </div>
-    </div>
+      </div><!-- end alerts panel -->
+
+      <!-- PANEL: System -->
+      <div class="ux-settings-tab-panel" id="ux-tab-panel-system" role="tabpanel" style="display:none;">
+
+        <div class="ux-settings-section ux-collapsible-section" id="ux-section-diagnostics">
+          <div class="ux-section-header">
+            <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;">Diagnostics &amp; Logs</div>
+            <button class="ux-section-toggle-btn" type="button" aria-label="Toggle diagnostics section">
+              <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          <div class="ux-section-body">
+            <div class="ux-setting-row" style="margin-top:8px;">
+              <span class="ux-setting-label">Debug logging</span>
+              <label class="ux-toggle"><input type="checkbox" id="ux-setting-debug"><span class="ux-toggle-track"></span></label>
+            </div>
+            <div class="ux-settings-btns-row" style="margin-top:10px;">
+              <button class="ux-settings-btn" id="ux-btn-export" type="button"><span id="ux-export-label">Export JSON</span><span id="ux-export-chip" class="ux-export-chip" aria-live="polite"></span></button>
+              <button class="ux-settings-btn ux-btn-with-badge" id="ux-btn-debug" type="button"><span>Debug logs</span><span class="ux-count-badge" id="ux-debug-count">0</span></button>
+            </div>
+          </div>
+        </div>
+
+        <div class="ux-settings-section ux-collapsible-section ux-section-collapsed ux-danger-zone" id="ux-section-danger-zone" style="margin-top:10px;">
+          <div class="ux-section-header">
+            <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;color:#ff6b6b;">&#9888; Danger Zone</div>
+            <button class="ux-section-toggle-btn" type="button" aria-label="Toggle danger zone">
+              <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#ff6b6b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          <div class="ux-section-body">
+            <div style="font-size:11px;color:var(--ux-text-3);margin:6px 0 8px;line-height:1.3;">These actions permanently delete local stats and log data.</div>
+            <div class="ux-settings-btns-row">
+              <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-reset" type="button">Reset Stats</button>
+              <button class="ux-settings-btn ux-btn-destructive" id="ux-btn-clear-debug" type="button">Clear Logs</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- end system panel -->
+    </div><!-- end settings-content -->
 
     <div class="ux-shortcut-footer">
       Press <kbd>Alt</kbd>+<kbd>U</kbd> to toggle panel
@@ -3088,6 +3162,71 @@ function getCSS() {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 12px;
+}
+/* ── Settings Tabs ── */
+.ux-settings-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px 6px 0;
+  border-bottom: 1px solid var(--ux-border);
+  margin: 0 -14px;
+  padding-left: 14px;
+  padding-right: 14px;
+}
+.ux-settings-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 5px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+  border: none;
+  background: none;
+  color: var(--ux-text-3);
+  cursor: pointer;
+  border-radius: 4px 4px 0 0;
+  transition: color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.ux-settings-tab:hover {
+  color: var(--ux-text-1);
+  background: var(--ux-hover);
+}
+.ux-settings-tab-active {
+  color: var(--ux-accent);
+  background: rgba(204, 153, 102, 0.08);
+  box-shadow: inset 0 -2px 0 var(--ux-accent);
+}
+.ux-settings-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+/* ── Nudge element ── */
+#ux-nudge-advanced {
+  font-size: 11px;
+  color: var(--ux-text-3);
+  text-align: center;
+  padding: 4px 0 2px;
+}
+#ux-nudge-advanced a {
+  color: var(--ux-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+#ux-nudge-advanced a:hover {
+  text-decoration: underline;
+}
+/* ── Danger Zone ── */
+.ux-danger-zone {
+  border: 1px solid rgba(255, 107, 107, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  background: rgba(255, 107, 107, 0.03);
 }
 .ux-settings-section {
   display: flex;

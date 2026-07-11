@@ -6,6 +6,7 @@ if (typeof browser === "undefined") {
 
 function defaultSettings() {
   return {
+    simple_mode: true,
     debug_logging: false,
     sidebar_side: 'left',
     timezone: 'auto',
