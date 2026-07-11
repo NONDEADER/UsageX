@@ -88,7 +88,7 @@ Claude page fetch()
 | `inject-loader.js` | Content script (isolated world) that appends `inject.js` as a page-level `<script>` tag |
 | `db.js` | IndexedDB wrapper: `daily_stats` & `convo_stats` stores, migration from `storage.local` |
 | `popup.html/css/js` | Toolbar popup: dashboard, history, tools, and help tabs |
-| `permissions.html/js` | One-time permission request page for browser notifications |
+| `permissions.html/js` | One-time permission request page for authorizing the Google Apps Script feedback connection |
 | `debug-viewer.html/css/js` | Standalone page for inspecting stored debug logs |
 | `icons/` | Extension icons (16 x 16, 48 x 48, 128 x 128) |
 
