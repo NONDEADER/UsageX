@@ -3,6 +3,8 @@
 [![Website](https://img.shields.io/badge/Website-usagex.carrd.co-4A90D9?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://usagex.carrd.co/)
 [![Firefox Add-on](https://img.shields.io/badge/Firefox-Install%20Add--on-FF7139?style=for-the-badge&logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/en-US/firefox/addon/usagex/)
 
+![UsageX v2 — sidebar panel injected into Claude.ai alongside the floating popup dashboard](assets/hero-banner.png)
+
 > A Firefox (Manifest V3) extension that tracks your **Claude.ai** usage and renders a live stats panel directly on the page — no external server, no third-party libraries, no build step required.
 
 ---
@@ -32,7 +34,9 @@
 - **Top Conversations** — lists the 5 conversations with highest estimated token cost.
 - **Daily log** — scrollable list of past daily stats stored in a local IndexedDB database.
 
-### Popup (Toolbar Button)
+### Popup Dashboard
+
+![Popup dashboard showing session/weekly usage bars, effort breakdown, model pill, and account status](assets/popup-detail.png)
 - **Quick stats strip** — session %, weekly %, and messages sent today shown immediately at the top.
 - **Active account card** — displays the logged-in account name, email, and Claude plan (Free / Pro / Max).
 - **Multi-account support** — data is namespaced per account; switching accounts in Claude is detected automatically.
@@ -41,6 +45,10 @@
 - **Reset Stats / Clear Logs** — danger-zone buttons with confirmation.
 - **Debug log viewer** — inline badge showing the current log count; opens the standalone `debug-viewer.html` page.
 - **In-app feedback form** — report bugs, request features, or ask questions directly from the Help tab; optionally attaches diagnostic info.
+
+### Sidebar Integration
+
+![Sidebar panel injected into Claude.ai showing session/weekly bars, peak hours indicator, and effort summary](assets/sidebar-view.png)
 
 ### Sidebar Panel (on Claude.ai)
 - **Messages-remaining estimate** — derived from your average token cost per message in the current 5-hour session.
