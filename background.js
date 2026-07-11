@@ -158,9 +158,42 @@ browser.storage.onChanged.addListener(async (changes, area) => {
   }
 });
 
+const FEEDBACK_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbynOs6pcwV0dsNC9tCshmZEpgQuh7xIgczi6UXJ--Rkwt3xD9FGtSKx3iFdjq8BvNlb/exec';
+
+async function submitFeedback(data) {
+  try {
+    const response = await fetch(FEEDBACK_APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(data)
+    });
+    if (!response.ok) {
+      throw new Error(`Server returned status ${response.status}`);
+    }
+    const result = await response.json();
+    return result;
+  } catch (err) {
+    console.error('[UsageX] Feedback submission error:', err);
+    return { success: false, error: err.message || String(err) };
+  }
+}
+
 // ─── Open popup from sidebar Help button ──────────────────────────────────────
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && message.action === 'REQUEST_FEEDBACK_PERMISSION') {
+    browser.tabs.create({ url: browser.runtime.getURL('permissions.html') });
+    sendResponse({ success: true });
+    return true;
+  }
+
+  if (message && message.action === 'SUBMIT_FEEDBACK') {
+    submitFeedback(message.data).then(sendResponse);
+    return true; // Keep channel open for async response
+  }
+
   if (message && message.action === 'OPEN_HELP_POPUP') {
     const actionApi = typeof browser !== 'undefined' && browser.action ? browser.action : (typeof chrome !== 'undefined' ? chrome.action : null);
 

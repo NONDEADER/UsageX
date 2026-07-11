@@ -2265,6 +2265,177 @@ function bindEvents() {
     });
   });
 
+  // Feedback Form handler in injected sidebar
+  const feedbackForm = root.querySelector('#ux-feedback-form');
+  if (feedbackForm) {
+    // Segment tab selector
+    const uxTypeTabs = feedbackForm.querySelectorAll('.ux-feedback-type-tab');
+    const uxTypeInput = root.querySelector('#ux-feedback-type');
+    uxTypeTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        uxTypeTabs.forEach(t => {
+          t.classList.remove('ux-type-active');
+          t.setAttribute('aria-checked', 'false');
+        });
+        tab.classList.add('ux-type-active');
+        tab.setAttribute('aria-checked', 'true');
+        if (uxTypeInput) uxTypeInput.value = tab.getAttribute('data-value');
+      });
+    });
+
+    // Diagnostics preview toggle
+    const uxDiagBtn = root.querySelector('#ux-diag-toggle-btn');
+    const uxDiagPre = root.querySelector('#ux-diag-pre');
+    if (uxDiagBtn && uxDiagPre) {
+      uxDiagBtn.addEventListener('click', async () => {
+        if (uxDiagPre.style.display === 'none') {
+          uxDiagPre.style.display = 'block';
+          uxDiagBtn.textContent = 'hide';
+          uxDiagPre.textContent = 'Loading...';
+          try {
+            const res = await browser.storage.local.get(['settings', 'today', 'debug_logs', 'user_plan']);
+            const manifest = browser.runtime.getManifest();
+            const settings = res.settings || {};
+            const today = res.today || {};
+            const logsCount = Array.isArray(res.debug_logs) ? res.debug_logs.length : 0;
+            const info = {
+              extension: `UsageX v${manifest.version}`,
+              plan: res.user_plan || 'Not detected',
+              timezone: settings.timezone || 'auto',
+              todayStats: { msgs: today.msgs || 0, convos: today.convos || 0, tokensEst: today.tokens_est || 0 },
+              debugLogsCount: logsCount,
+              settings: { simpleMode: settings.simple_mode, floating: settings.floating }
+            };
+            uxDiagPre.textContent = JSON.stringify(info, null, 2);
+          } catch (err) {
+            uxDiagPre.textContent = 'Error: ' + err.message;
+          }
+        } else {
+          uxDiagPre.style.display = 'none';
+          uxDiagBtn.textContent = 'show';
+        }
+      });
+    }
+
+    feedbackForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const type = root.querySelector('#ux-feedback-type').value;
+      const email = root.querySelector('#ux-feedback-email').value.trim();
+      const message = root.querySelector('#ux-feedback-message').value.trim();
+      const includeDiagnostics = root.querySelector('#ux-feedback-diagnostics').checked;
+      const submitBtn = root.querySelector('#ux-feedback-submit');
+      const statusEl = root.querySelector('#ux-feedback-status');
+
+      if (message.length < 10) {
+        showFeedbackStatus('Message must be at least 10 characters long.', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      const originalBtnText = submitBtn.textContent;
+      submitBtn.textContent = 'Sending...';
+      showFeedbackStatus('', 'none');
+
+      try {
+        const origins = [
+          "https://script.google.com/*",
+          "https://script.googleusercontent.com/*"
+        ];
+        
+        let granted = false;
+        try {
+          granted = await browser.permissions.contains({ origins });
+        } catch (pe) {
+          console.warn('[UsageX] Permissions query warning:', pe);
+          granted = true; // Fallback to let fetch try
+        }
+
+        if (!granted) {
+          showFeedbackStatus('Authorization required. Opening tab to authorize connection...', 'error');
+          browser.runtime.sendMessage({ action: 'REQUEST_FEEDBACK_PERMISSION' });
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalBtnText;
+          return;
+        }
+
+        let diagnostics = '';
+        if (includeDiagnostics) {
+          const res = await browser.storage.local.get(['settings', 'today', 'debug_logs', 'user_plan']);
+          const manifest = browser.runtime.getManifest();
+          const settings = res.settings || {};
+          const today = res.today || {};
+          const logsCount = Array.isArray(res.debug_logs) ? res.debug_logs.length : 0;
+
+          const info = {
+            extension: `UsageX v${manifest.version}`,
+            userAgent: navigator.userAgent,
+            plan: res.user_plan || 'Not detected',
+            timezone: settings.timezone || 'auto',
+            todayStats: {
+              msgs: today.msgs || 0,
+              convos: today.convos || 0,
+              tokensEst: today.tokens_est || 0
+            },
+            debugLogsCount: logsCount,
+            settings: {
+              simpleMode: settings.simple_mode,
+              floating: settings.floating,
+              resizable: settings.resizable,
+              notificationsBrowser: settings.notifications_browser,
+              notificationsToast: settings.notifications_toast
+            }
+          };
+          diagnostics = JSON.stringify(info, null, 2);
+        }
+
+        const payload = {
+          type,
+          email: email || 'Anonymous',
+          message,
+          diagnostics
+        };
+
+        browser.runtime.sendMessage(
+          { action: 'SUBMIT_FEEDBACK', data: payload },
+          (response) => {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalBtnText;
+
+            if (browser.runtime.lastError) {
+              showFeedbackStatus(`Error: ${browser.runtime.lastError.message}`, 'error');
+              return;
+            }
+
+            if (response && response.success) {
+              showFeedbackStatus('✓ Submitted successfully!', 'success');
+              feedbackForm.reset();
+              setTimeout(() => showFeedbackStatus('', 'none'), 4000);
+            } else {
+              showFeedbackStatus(`Failed: ${response ? response.error : 'Unknown error'}`, 'error');
+            }
+          }
+        );
+      } catch (err) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+        showFeedbackStatus(`Error: ${err.message || err}`, 'error');
+      }
+
+      function showFeedbackStatus(text, statusType) {
+        if (!statusEl) return;
+        statusEl.textContent = text;
+        statusEl.className = 'ux-feedback-status';
+        if (statusType === 'none') {
+          statusEl.style.display = 'none';
+        } else {
+          statusEl.style.display = 'block';
+          statusEl.classList.add(`status-${statusType}`);
+        }
+      }
+    });
+  }
+
   root.querySelector('#ux-btn-export')?.addEventListener('click', async () => {
     await exportData();
     const chip = root.querySelector('#ux-export-chip');
@@ -2974,7 +3145,49 @@ function getSidebarHTML() {
       <!-- PANEL: System -->
       <div class="ux-settings-tab-panel" id="ux-tab-panel-system" role="tabpanel" style="display:none;">
 
-        <div class="ux-settings-section ux-collapsible-section" id="ux-section-diagnostics">
+        <!-- Support & Feedback Section -->
+        <div class="ux-settings-section ux-collapsible-section ux-section-collapsed" id="ux-section-support" style="margin-top:0px;">
+          <div class="ux-section-header">
+            <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;">Support &amp; Feedback</div>
+            <button class="ux-section-toggle-btn" type="button" aria-label="Toggle support section">
+              <svg class="ux-chevron-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+          </div>
+          <div class="ux-section-body">
+            <form id="ux-feedback-form" novalidate>
+              <div class="ux-form-row">
+                <div class="ux-feedback-type-tabs" role="radiogroup">
+                  <button type="button" class="ux-feedback-type-tab ux-type-active" data-value="bug" aria-checked="true">Bug</button>
+                  <button type="button" class="ux-feedback-type-tab" data-value="feature" aria-checked="false">Feature</button>
+                  <button type="button" class="ux-feedback-type-tab" data-value="question" aria-checked="false">Question</button>
+                </div>
+                <input type="hidden" id="ux-feedback-type" value="bug">
+                <div class="ux-input-wrapper">
+                  <svg class="ux-input-icon" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  <input type="email" id="ux-feedback-email" class="ux-form-input" placeholder="Email (opt)">
+                </div>
+              </div>
+              <div class="ux-form-group">
+                <textarea id="ux-feedback-message" class="ux-form-textarea" placeholder="Describe the issue or suggestion (min 10 chars)..." minlength="10" required></textarea>
+              </div>
+              <div class="ux-form-diag-row">
+                <div class="ux-form-checkbox-row">
+                  <label class="ux-toggle">
+                    <input type="checkbox" id="ux-feedback-diagnostics" checked>
+                    <span class="ux-toggle-track"></span>
+                  </label>
+                  <span class="ux-form-checkbox-label">Diagnostics info</span>
+                </div>
+                <span class="ux-diag-toggle-btn" id="ux-diag-toggle-btn">show</span>
+              </div>
+              <pre id="ux-diag-pre" style="display: none;"></pre>
+              <button class="ux-settings-btn" id="ux-feedback-submit" type="submit" style="padding:6px 0; font-weight:600;">Send Feedback</button>
+            </form>
+            <div id="ux-feedback-status" class="ux-feedback-status"></div>
+          </div>
+        </div>
+
+        <div class="ux-settings-section ux-collapsible-section" id="ux-section-diagnostics" style="margin-top:10px;">
           <div class="ux-section-header">
             <div class="ux-settings-section-title" style="margin:0;padding-bottom:0;">Diagnostics &amp; Logs</div>
             <button class="ux-section-toggle-btn" type="button" aria-label="Toggle diagnostics section">
@@ -4472,6 +4685,154 @@ body.light .ux-toast-close:hover { color: #141413; }
   background: rgba(100, 116, 139, 0.1);
   color: var(--ux-text-3);
   border-color: rgba(100, 116, 139, 0.2);
+}
+
+/* ─── Feedback Form ────────────────────────────────────────── */
+#ux-feedback-form {
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.ux-form-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.ux-form-group { display: flex; flex-direction: column; }
+/* Segment selector */
+.ux-feedback-type-tabs {
+  display: flex;
+  background: var(--ux-bg);
+  padding: 2px;
+  border-radius: var(--ux-radius);
+  border: 1px solid var(--ux-border);
+  flex: 1.4;
+}
+.ux-feedback-type-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--ux-text-3);
+  font-family: var(--ux-font);
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 4px 0;
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.15s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+.ux-feedback-type-tab:hover { color: var(--ux-text-2); }
+.ux-feedback-type-tab.ux-type-active {
+  background: var(--ux-surface-3);
+  color: var(--ux-accent);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+}
+/* Email input with icon */
+.ux-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+.ux-input-icon {
+  position: absolute;
+  left: 7px;
+  color: var(--ux-text-3);
+  pointer-events: none;
+}
+.ux-form-input {
+  width: 100%;
+  background: #111111;
+  border: 1px solid var(--ux-border);
+  border-radius: var(--ux-radius);
+  color: var(--ux-text-1);
+  font-family: var(--ux-font);
+  font-size: 10.5px;
+  padding: 5px 6px 5px 22px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.ux-form-input:focus,
+.ux-form-textarea:focus {
+  border-color: var(--ux-accent);
+  box-shadow: 0 0 0 2px rgba(204, 153, 102, 0.12);
+}
+.ux-form-textarea {
+  width: 100%;
+  background: #111111;
+  border: 1px solid var(--ux-border);
+  border-radius: var(--ux-radius);
+  color: var(--ux-text-1);
+  font-family: var(--ux-font);
+  font-size: 10.5px;
+  padding: 5px 7px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  height: 52px;
+  resize: none;
+  box-sizing: border-box;
+}
+/* Diagnostics row */
+.ux-form-diag-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ux-form-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ux-form-checkbox-label {
+  font-size: 10px;
+  color: var(--ux-text-3);
+}
+.ux-diag-toggle-btn {
+  font-size: 10px;
+  color: var(--ux-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  opacity: 0.8;
+  transition: opacity 0.15s;
+}
+.ux-diag-toggle-btn:hover { opacity: 1; }
+#ux-diag-pre {
+  background: var(--ux-bg);
+  border: 1px solid var(--ux-border);
+  border-radius: var(--ux-radius);
+  padding: 5px 7px;
+  font-size: 9px;
+  color: var(--ux-text-3);
+  font-family: monospace;
+  max-height: 72px;
+  overflow-y: auto;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.ux-feedback-status {
+  padding: 5px 8px;
+  border-radius: var(--ux-radius);
+  line-height: 1.4;
+  font-size: 10.5px;
+  margin-top: 4px;
+  display: none;
+}
+.ux-feedback-status.status-success {
+  background: rgba(74, 222, 128, 0.08);
+  color: var(--ux-green-bright);
+  border: 1px solid rgba(74, 222, 128, 0.15);
+  display: block;
+}
+.ux-feedback-status.status-error {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--ux-red);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  display: block;
 }
   `;
 }

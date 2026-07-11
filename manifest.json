@@ -14,7 +14,9 @@
   },
   "host_permissions": [
     "https://claude.ai/*",
-    "https://www.claude.ai/*"
+    "https://www.claude.ai/*",
+    "https://script.google.com/*",
+    "https://script.googleusercontent.com/*"
   ],
   "background": {
     "scripts": ["background.js"],
@@ -47,7 +49,9 @@
         "inject.js",
         "popup.html",
         "popup.css",
-        "popup.js"
+        "popup.js",
+        "permissions.html",
+        "permissions.js"
       ],
       "matches": [
         "https://claude.ai/*",

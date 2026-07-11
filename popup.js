@@ -1220,6 +1220,194 @@ async function init() {
     const btn = document.getElementById(`tab-${targetTab}`);
     if (btn) btn.click();
   }
+
+  // Initialize feedback form functionality
+  initFeedbackForm().catch(err => console.error('[UsageX] initFeedbackForm failed:', err));
+}
+
+async function initFeedbackForm() {
+  const form = document.getElementById('px-feedback-form');
+  const statusEl = document.getElementById('px-feedback-status');
+  const submitBtn = document.getElementById('px-feedback-submit');
+
+  if (!form) return;
+
+  // Handle segment selector clicks
+  const typeTabs = form.querySelectorAll('.px-feedback-type-tab');
+  const typeInput = document.getElementById('px-feedback-type');
+  typeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      typeTabs.forEach(t => {
+        t.classList.remove('px-type-active');
+        t.setAttribute('aria-checked', 'false');
+      });
+      tab.classList.add('px-type-active');
+      tab.setAttribute('aria-checked', 'true');
+      if (typeInput) typeInput.value = tab.getAttribute('data-value');
+    });
+  });
+
+  // Handle diagnostics details toggle
+  const diagToggleBtn = document.getElementById('px-diag-toggle-btn');
+  const diagPre = document.getElementById('px-diag-pre');
+  if (diagToggleBtn && diagPre) {
+    diagToggleBtn.addEventListener('click', async () => {
+      if (diagPre.style.display === 'none') {
+        diagPre.style.display = 'block';
+        diagToggleBtn.textContent = 'hide';
+        
+        diagPre.textContent = 'Loading diagnostics preview...';
+        try {
+          const res = await browser.storage.local.get(['settings', 'today', 'debug_logs', 'user_plan']);
+          const manifest = browser.runtime.getManifest();
+          const settings = res.settings || {};
+          const today = res.today || {};
+          const logsCount = Array.isArray(res.debug_logs) ? res.debug_logs.length : 0;
+
+          const info = {
+            extension: `UsageX v${manifest.version}`,
+            userAgent: navigator.userAgent.substring(0, 80) + '...',
+            plan: res.user_plan || 'Not detected',
+            timezone: settings.timezone || 'auto',
+            todayStats: {
+              msgs: today.msgs || 0,
+              convos: today.convos || 0,
+              tokensEst: today.tokens_est || 0
+            },
+            debugLogsCount: logsCount,
+            settings: {
+              simpleMode: settings.simple_mode,
+              floating: settings.floating
+            }
+          };
+          diagPre.textContent = JSON.stringify(info, null, 2);
+        } catch (err) {
+          diagPre.textContent = 'Error loading diagnostics: ' + err.message;
+        }
+      } else {
+        diagPre.style.display = 'none';
+        diagToggleBtn.textContent = 'show';
+      }
+    });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const type = document.getElementById('px-feedback-type').value;
+    const email = document.getElementById('px-feedback-email').value.trim();
+    const message = document.getElementById('px-feedback-message').value.trim();
+    const includeDiagnostics = document.getElementById('px-feedback-diagnostics').checked;
+
+    if (message.length < 10) {
+      showStatus('Message must be at least 10 characters long.', 'error');
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+    showStatus('', 'none');
+
+    try {
+      const origins = [
+        "https://script.google.com/*",
+        "https://script.googleusercontent.com/*"
+      ];
+      
+      let granted = false;
+      try {
+        granted = await browser.permissions.contains({ origins });
+        if (!granted) {
+          granted = await browser.permissions.request({ origins });
+        }
+      } catch (pe) {
+        console.warn('[UsageX] Permissions query warning:', pe);
+        granted = true; // Fallback to let fetch try
+      }
+
+      if (!granted) {
+        showStatus('Permission to contact feedback server was denied.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Feedback';
+        return;
+      }
+
+      let diagnostics = '';
+      if (includeDiagnostics) {
+        const res = await browser.storage.local.get(['settings', 'today', 'debug_logs', 'user_plan']);
+        const manifest = browser.runtime.getManifest();
+        const settings = res.settings || {};
+        const today = res.today || {};
+        const logsCount = Array.isArray(res.debug_logs) ? res.debug_logs.length : 0;
+
+        const info = {
+          extension: `UsageX v${manifest.version}`,
+          userAgent: navigator.userAgent,
+          plan: res.user_plan || 'Not detected',
+          timezone: settings.timezone || 'auto',
+          todayStats: {
+            msgs: today.msgs || 0,
+            convos: today.convos || 0,
+            tokensEst: today.tokens_est || 0
+          },
+          debugLogsCount: logsCount,
+          settings: {
+            simpleMode: settings.simple_mode,
+            floating: settings.floating,
+            resizable: settings.resizable,
+            notificationsBrowser: settings.notifications_browser,
+            notificationsToast: settings.notifications_toast
+          }
+        };
+        diagnostics = JSON.stringify(info, null, 2);
+      }
+
+      const payload = {
+        type,
+        email: email || 'Anonymous',
+        message,
+        diagnostics
+      };
+
+      browser.runtime.sendMessage(
+        { action: 'SUBMIT_FEEDBACK', data: payload },
+        (response) => {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Send Feedback';
+
+          if (browser.runtime.lastError) {
+            showStatus(`Error: ${browser.runtime.lastError.message}`, 'error');
+            return;
+          }
+
+          if (response && response.success) {
+            showStatus('✓ Feedback submitted successfully!', 'success');
+            form.reset();
+            // Automatically clear success message after 4 seconds
+            setTimeout(() => showStatus('', 'none'), 4000);
+          } else {
+            showStatus(`Failed to send: ${response ? response.error : 'Unknown error'}`, 'error');
+          }
+        }
+      );
+    } catch (err) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Send Feedback';
+      showStatus(`Error: ${err.message || err}`, 'error');
+    }
+  });
+
+  function showStatus(text, type) {
+    if (!statusEl) return;
+    statusEl.textContent = text;
+    statusEl.className = 'px-feedback-status';
+    if (type === 'none') {
+      statusEl.style.display = 'none';
+    } else {
+      statusEl.style.display = 'block';
+      statusEl.classList.add(`status-${type}`);
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
