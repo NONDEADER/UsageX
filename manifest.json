@@ -68,7 +68,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "usagex-v2@ayumystic",
+      "id": "usagex@local.extension",
       "strict_min_version": "109.0"
     }
   }
