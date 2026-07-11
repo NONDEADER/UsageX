@@ -117,7 +117,7 @@ async function loadToday() {
   } catch (err) {
     console.error('[UsageX] Migration failed:', err);
   }
-  const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits']);
+  const res = await browser.storage.local.get(['today', 'history', 'settings', 'usage_limits', 'user_plan']);
   const settings = res.settings || defaultSettings();
   const ianaTz = getIANATimezone(settings.timezone);
   const todayDate = todayStr(ianaTz);
@@ -129,9 +129,9 @@ async function loadToday() {
     }
     const fresh = freshToday(ianaTz);
     await browser.storage.local.set({ today: fresh });
-    return { today: fresh, settings: settings, usage_limits: res.usage_limits };
+    return { today: fresh, settings: settings, usage_limits: res.usage_limits, user_plan: res.user_plan || '' };
   }
-  return { today: res.today, settings: settings, usage_limits: res.usage_limits };
+  return { today: res.today, settings: settings, usage_limits: res.usage_limits, user_plan: res.user_plan || '' };
 }
 
 async function saveToday(patch) {
@@ -1253,30 +1253,80 @@ function formatPctValue(pct) {
   return Number.isInteger(rounded) ? String(Math.trunc(rounded)) : String(rounded);
 }
 
-function getSessionTokensUsed(sessionPct) {
+function isPeakHours(settingsTimezone) {
+  try {
+    const tz = settingsTimezone === 'auto' ? getTimezoneName() : (settingsTimezone || 'auto');
+    const ianaTz = getIANATimezone(tz);
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: ianaTz,
+      hour: 'numeric',
+      minute: 'numeric',
+      weekday: 'short',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+    const isWeekend = weekday === 'Sat' || weekday === 'Sun';
+
+    const h = Number(parts.find(p => p.type === 'hour')?.value || 0);
+    const m = Number(parts.find(p => p.type === 'minute')?.value || 0);
+    const curH = h + m / 60;
+    return !isWeekend && (curH >= 18.5 || curH < 0.5);
+  } catch (e) {
+    const now = new Date();
+    const utcMs = now.getTime() + now.getTimezoneOffset() * 60000;
+    const istMs = utcMs + 5.5 * 3600000;
+    const ist = new Date(istMs);
+    const curH = ist.getHours() + ist.getMinutes() / 60;
+    const day = ist.getDay();
+    const isWeekend = day === 0 || day === 6;
+    return !isWeekend && (curH >= 18.5 || curH < 0.5);
+  }
+}
+
+function getSessionLimit(userPlan, settingsTimezone) {
+  const plan = String(userPlan || '').toLowerCase();
+  let baseLimit = 3000000; // Default Pro fallback
+  if (plan.includes('max x20') || plan.includes('max_20x') || plan.includes('max20x')) {
+    baseLimit = 60000000;
+  } else if (plan.includes('max x5') || plan.includes('max_5x') || plan.includes('max5') || plan.includes('max')) {
+    baseLimit = 15000000;
+  } else if (plan.includes('pro')) {
+    baseLimit = 3000000;
+  } else if (plan.includes('free')) {
+    baseLimit = 375000;
+  }
+
+  if (isPeakHours(settingsTimezone)) {
+    return baseLimit / 1.5;
+  }
+  return baseLimit;
+}
+
+function getSessionTokensUsed(sessionPct, userPlan, settingsTimezone) {
   const pct = clamp(Number(sessionPct) || 0, 0, 100);
-  return Math.round((pct / 100) * SESSION_TOKEN_LIMIT);
+  return Math.round((pct / 100) * getSessionLimit(userPlan, settingsTimezone));
 }
 
 function formatTokenCount(value) {
   return new Intl.NumberFormat('en-IN').format(Math.max(0, Math.round(value || 0)));
 }
 
-function getSessionTooltipText(sessionPct) {
+function getSessionTooltipText(sessionPct, userPlan, settingsTimezone) {
   if (sessionPct == null) return '';
-  const usedTokens = getSessionTokensUsed(sessionPct);
-  return `${formatTokenCount(usedTokens)} / ${formatTokenCount(SESSION_TOKEN_LIMIT)} tokens (${formatPctValue(sessionPct)}%)`;
+  const limit = getSessionLimit(userPlan, settingsTimezone);
+  const usedTokens = getSessionTokensUsed(sessionPct, userPlan, settingsTimezone);
+  return `${formatTokenCount(usedTokens)} / ${formatTokenCount(limit)} tokens (${formatPctValue(sessionPct)}%)`;
 }
 
 function getWeeklyTooltipText(weeklyPct) {
   if (weeklyPct == null) return '';
-  const pct = clamp(Number(weeklyPct) || 0, 0, 100);
-  const usedTokens = Math.round((pct / 100) * WEEKLY_TOKEN_LIMIT);
-  return `${formatTokenCount(usedTokens)} / ${formatTokenCount(WEEKLY_TOKEN_LIMIT)} tokens (${formatPctValue(weeklyPct)}%)`;
+  return `${formatPctValue(weeklyPct)}% used`;
 }
 
 // Estimate remaining messages from msg_sent debug logs in the active 5-hour session window.
-function estimateMessagesRemaining(sessionPct, sessionResetAt, debugLogs) {
+function estimateMessagesRemaining(sessionPct, sessionResetAt, debugLogs, userPlan, settingsTimezone) {
   if (sessionPct == null || Number(sessionPct) <= 0 || !sessionResetAt) return null;
 
   const resetAtMs = new Date(sessionResetAt).getTime();
@@ -1306,7 +1356,8 @@ function estimateMessagesRemaining(sessionPct, sessionResetAt, debugLogs) {
   const avgTokensPerMessage = totalTokens / sessionLogs.length;
   if (!Number.isFinite(avgTokensPerMessage) || avgTokensPerMessage <= 0) return null;
 
-  const remainingTokens = Math.max(0, SESSION_TOKEN_LIMIT - getSessionTokensUsed(sessionPct));
+  const limit = getSessionLimit(userPlan, settingsTimezone);
+  const remainingTokens = Math.max(0, limit - getSessionTokensUsed(sessionPct, userPlan, settingsTimezone));
   return Math.max(0, Math.floor(remainingTokens / avgTokensPerMessage));
 }
 
@@ -1403,7 +1454,7 @@ async function updateUI() {
   const root = document.getElementById(UX_ID);
   if (!root) return;
 
-  const { today, settings, usage_limits } = await loadToday();
+  const { today, settings, usage_limits, user_plan } = await loadToday();
   const tz = settings.timezone === 'auto' ? getTimezoneName() : settings.timezone;
 
   // Usage % from API or DOM
@@ -1460,7 +1511,7 @@ async function updateUI() {
 
   const sessionTrack = root.querySelector('#ux-session-track');
   if (sessionTrack) {
-    const tooltipText = getSessionTooltipText(sessionPct);
+    const tooltipText = getSessionTooltipText(sessionPct, user_plan, tz);
     if (tooltipText && Number(sessionPct) > 0) {
       sessionTrack.setAttribute('data-tooltip', tooltipText);
     } else {
@@ -1547,10 +1598,10 @@ async function updateUI() {
   const dbgCount = debugLogs.length;
   setEl('#ux-debug-count', `${dbgCount}`);
 
-  const sessionRemainingEstimate = estimateMessagesRemaining(sessionPct, usage_limits?.session_resets_at, debugLogs);
+  const sessionRemainingEstimate = estimateMessagesRemaining(sessionPct, usage_limits?.session_resets_at, debugLogs, user_plan, tz);
   const sessionTrackForRemaining = root.querySelector('#ux-session-track');
   if (sessionTrackForRemaining) {
-    let tipText = getSessionTooltipText(sessionPct);
+    let tipText = getSessionTooltipText(sessionPct, user_plan, tz);
     if (tipText && Number(sessionPct) > 0) {
       sessionTrackForRemaining.setAttribute('data-tooltip', tipText);
     }

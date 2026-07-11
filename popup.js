@@ -121,23 +121,64 @@ function getThresholdColor(pct) {
   return '#4ade80';
 }
 
-const SESSION_TOKEN_LIMIT = 375000;
-const WEEKLY_TOKEN_LIMIT = 3750000;
-
 function formatTokenCount(value) {
   return new Intl.NumberFormat('en-IN').format(Math.max(0, Math.round(value || 0)));
 }
 
-function getSessionTooltipText(sessionPct) {
+function isPeakHours(ianaTz) {
+  try {
+    const tz = ianaTz || Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      weekday: 'short',
+      hour12: false
+    });
+    const parts = formatter.formatToParts(now);
+    const weekday = parts.find(p => p.type === 'weekday')?.value || '';
+    const isWeekend = weekday === 'Sat' || weekday === 'Sun';
+
+    const h = Number(parts.find(p => p.type === 'hour')?.value || 0);
+    const m = Number(parts.find(p => p.type === 'minute')?.value || 0);
+    const curH = h + m / 60;
+    return !isWeekend && (curH >= 18.5 || curH < 0.5);
+  } catch (e) {
+    const { inPeak } = getPeakStatus();
+    return inPeak;
+  }
+}
+
+function getSessionLimit(userPlan, ianaTz) {
+  const plan = String(userPlan || '').toLowerCase();
+  let baseLimit = 3000000; // Default Pro fallback
+  if (plan.includes('max x20') || plan.includes('max_20x') || plan.includes('max20x')) {
+    baseLimit = 60000000;
+  } else if (plan.includes('max x5') || plan.includes('max_5x') || plan.includes('max5') || plan.includes('max')) {
+    baseLimit = 15000000;
+  } else if (plan.includes('pro')) {
+    baseLimit = 3000000;
+  } else if (plan.includes('free')) {
+    baseLimit = 375000;
+  }
+
+  if (isPeakHours(ianaTz)) {
+    return baseLimit / 1.5;
+  }
+  return baseLimit;
+}
+
+function getSessionTooltipText(sessionPct, userPlan, ianaTz) {
   if (sessionPct == null) return '';
-  const used = Math.round((Number(sessionPct) / 100) * SESSION_TOKEN_LIMIT);
-  return `${formatTokenCount(used)} / ${formatTokenCount(SESSION_TOKEN_LIMIT)} tokens (${Math.round(sessionPct)}%)`;
+  const limit = getSessionLimit(userPlan, ianaTz);
+  const used = Math.round((Number(sessionPct) / 100) * limit);
+  return `${formatTokenCount(used)} / ${formatTokenCount(limit)} tokens (${Math.round(sessionPct)}%)`;
 }
 
 function getWeeklyTooltipText(weeklyPct) {
   if (weeklyPct == null) return '';
-  const used = Math.round((Number(weeklyPct) / 100) * WEEKLY_TOKEN_LIMIT);
-  return `${formatTokenCount(used)} / ${formatTokenCount(WEEKLY_TOKEN_LIMIT)} tokens (${Math.round(weeklyPct)}%)`;
+  return `${Math.round(weeklyPct)}% used`;
 }
 
 function getPeakStatus() {
@@ -356,7 +397,7 @@ async function refreshDashboard() {
   // ── Tooltips for tracks ──
   const sessionTrack = el('px-track-session');
   if (sessionTrack && sessionPct != null) {
-    sessionTrack.setAttribute('data-tooltip', getSessionTooltipText(sessionPct));
+    sessionTrack.setAttribute('data-tooltip', getSessionTooltipText(sessionPct, userPlan, ianaTz));
   } else if (sessionTrack) {
     sessionTrack.removeAttribute('data-tooltip');
   }
