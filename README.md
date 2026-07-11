@@ -128,7 +128,7 @@ Or load it as a temporary add-on from source:
 |---|---|
 | `storage` | Saves settings and live keys (`today`, `usage_limits`, `user_email`, etc.) locally |
 | `alarms` | Schedules session/weekly reset-approaching and reset notifications |
-| `tabs` | Opens the debug viewer and permissions page in a new tab |
+| `tabs` | Opens internal pages in new tabs, queries active tab to detect Claude context, and switches to existing open Claude tabs to avoid duplicates |
 | `notifications` | Shows browser-native reset alerts (only when explicitly enabled by the user in Settings) |
 | `host_permissions: claude.ai` | Allows the content script and fetch hook to run on Claude |
 | `host_permissions: script.google.com` | Used only for the optional user-initiated feedback form submission |
@@ -166,7 +166,7 @@ Alert thresholds (50 – 95%) for session and weekly usage can be set from the *
 
 ## License
 
-MIT
+MIT — Copyright (c) 2026 Ayush Yadav. See [LICENSE](LICENSE) for full text.
 
 ---
 

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy — UsageX</title>
+  <link rel="stylesheet" href="assets/fonts/fonts.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0e0e0e;
+      color: #d4cdc5;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 15px;
+      line-height: 1.7;
+      padding: 48px 24px 80px;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #cc9966;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 40px;
+      opacity: 0.85;
+      transition: opacity 0.15s;
+    }
+    .back-link:hover { opacity: 1; }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #f0ebe4;
+      margin-bottom: 6px;
+      letter-spacing: -0.3px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #7a7069;
+      margin-bottom: 40px;
+    }
+
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #cc9966;
+      margin-top: 40px;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+
+    p { margin-bottom: 14px; color: #b8b0a8; }
+
+    ul {
+      padding-left: 20px;
+      margin-bottom: 14px;
+      color: #b8b0a8;
+    }
+    ul li { margin-bottom: 6px; }
+
+    strong { color: #d4cdc5; font-weight: 600; }
+
+    .callout {
+      background: #141414;
+      border: 1px solid #2a2a2a;
+      border-left: 3px solid #cc9966;
+      border-radius: 6px;
+      padding: 14px 18px;
+      margin: 20px 0;
+      font-size: 14px;
+      color: #a09890;
+    }
+
+    .badge {
+      display: inline-block;
+      background: rgba(204, 153, 102, 0.12);
+      color: #cc9966;
+      border: 1px solid rgba(204, 153, 102, 0.25);
+      border-radius: 4px;
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 7px;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .badge.green {
+      background: rgba(74, 222, 128, 0.08);
+      color: #4ade80;
+      border-color: rgba(74, 222, 128, 0.2);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 20px;
+      font-size: 13.5px;
+    }
+    th {
+      text-align: left;
+      padding: 8px 12px;
+      background: #141414;
+      color: #7a7069;
+      font-weight: 600;
+      border-bottom: 1px solid #2a2a2a;
+    }
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #1a1a1a;
+      color: #b8b0a8;
+      vertical-align: top;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    .footer {
+      margin-top: 60px;
+      padding-top: 20px;
+      border-top: 1px solid #1e1e1e;
+      font-size: 12.5px;
+      color: #555;
+    }
+    .footer a { color: #cc9966; text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <a class="back-link" href="https://usagex.carrd.co/">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to UsageX
+    </a>
+
+    <h1>Privacy Policy</h1>
+    <p class="subtitle">Last updated: July 2026 &nbsp;·&nbsp; Applies to UsageX v2 (Firefox &amp; Chrome extension)</p>
+
+    <div class="callout">
+      <strong>Short version:</strong> UsageX stores all your usage data locally on your device. The only data that ever leaves your device is what <em>you</em> voluntarily submit via the feedback form.
+    </div>
+
+    <h2>1. What data is collected</h2>
+    <p>UsageX tracks your Claude.ai usage statistics and stores them entirely within your browser's local storage (<code>browser.storage.local</code> and IndexedDB). No account is created, no server is involved, and no data is synced to any cloud service.</p>
+
+    <p>Data stored locally includes:</p>
+    <ul>
+      <li>Session and weekly token usage percentages (read from Claude's own API responses)</li>
+      <li>Daily message count, active time, estimated token totals</li>
+      <li>Effort breakdown (Low / Medium / High / Max thinking levels)</li>
+      <li>Models used per session</li>
+      <li>Conversation-level message and token estimates</li>
+      <li>Reset timestamps for session and weekly limits</li>
+      <li>Your Claude plan (Free / Pro / Max), name, and email — scraped from the Claude UI or API response and used only to label the dashboard</li>
+      <li>A rolling window of one-way djb2 hashes of outgoing messages, used exclusively to prevent double-counting (the original message text is never stored)</li>
+      <li>Extension settings (sidebar position, notification preferences, timezone, etc.)</li>
+    </ul>
+
+    <h2>2. Data that leaves your device</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Scenario</th>
+          <th>Data sent</th>
+          <th>Destination</th>
+          <th>Trigger</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Feedback form</strong></td>
+          <td>Feedback type, message text, optional email address, optional diagnostics snapshot</td>
+          <td>Google Sheets via Google Apps Script (developer-controlled)</td>
+          <td><span class="badge">Manual</span> Only when you click "Send Feedback"</td>
+        </tr>
+        <tr>
+          <td><strong>Everything else</strong></td>
+          <td>Nothing</td>
+          <td>—</td>
+          <td><span class="badge green">Never</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>The feedback form is entirely optional. Submitting it is always a deliberate, user-initiated action. The form is never triggered automatically.</p>
+
+    <h2>3. Feedback form — detailed breakdown</h2>
+    <p>When you submit the feedback form, the following information is sent in a single HTTPS POST request to a Google Apps Script endpoint operated by the developer:</p>
+    <ul>
+      <li><strong>Feedback type</strong> — Bug, Feature, or Question (you select this)</li>
+      <li><strong>Message</strong> — the text you typed</li>
+      <li><strong>Email</strong> — only if you choose to enter one (the field is optional; it defaults to "Anonymous")</li>
+      <li><strong>Diagnostics snapshot</strong> — only if the "Diagnostics info" toggle is checked (on by default). This includes: extension version, browser user agent string, your Claude plan, timezone setting, today's aggregate message/token counts (numbers only — no message content), and a count of stored debug log entries.</li>
+    </ul>
+    <p>This data is stored in a private Google Spreadsheet visible only to the developer and is used solely to improve UsageX. It is not sold, shared, or used for advertising.</p>
+
+    <h2>4. Permissions — why each is needed</h2>
+    <table>
+      <thead>
+        <tr><th>Permission</th><th>Why it's needed</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>storage</code></td><td>Stores all usage stats and settings locally on your device</td></tr>
+        <tr><td><code>alarms</code></td><td>Schedules local notifications for session/weekly limit resets</td></tr>
+        <tr><td><code>tabs</code></td><td>Opens internal pages (debug viewer, permissions page), queries active tab to detect Claude.ai context for the popup, and switches focus to an existing open Claude.ai tab to prevent duplicate tabs</td></tr>
+        <tr><td><code>notifications</code></td><td>Shows browser-native reset alerts — only if you enable this in Settings</td></tr>
+        <tr><td><code>host: claude.ai</code></td><td>Allows the content script and fetch hook to read usage data from Claude's API responses</td></tr>
+        <tr><td><code>host: script.google.com</code></td><td>Allows the background script to POST feedback to the Google Apps Script endpoint — only used when you submit the feedback form</td></tr>
+      </tbody>
+    </table>
+
+    <h2>5. Data retention and deletion</h2>
+    <p>All locally stored data can be deleted at any time from within the extension:</p>
+    <ul>
+      <li><strong>Reset Stats</strong> — clears today's counters and the 30-day history</li>
+      <li><strong>Clear Logs</strong> — deletes all debug log entries</li>
+      <li>Uninstalling the extension removes all local storage automatically</li>
+    </ul>
+    <p>Data you submitted via the feedback form cannot be retrieved or deleted after submission, as it is stored in the developer's private spreadsheet with no user identifiers (unless you provided an email address, in which case you can request deletion by emailing <a href="mailto:nondeader.dev@gmail.com">nondeader.dev@gmail.com</a>).</p>
+
+    <h2>6. Third-party services</h2>
+    <p>UsageX does not use any analytics services, crash reporting tools, or advertising networks. The only third-party service the extension communicates with is <strong>Google Apps Script</strong>, and only when you explicitly submit feedback.</p>
+
+    <h2>7. Children</h2>
+    <p>UsageX is not directed at children under 13 and does not knowingly collect information from children.</p>
+
+    <h2>8. Changes to this policy</h2>
+    <p>If the privacy practices of UsageX change significantly (e.g. new data collection is introduced), this page will be updated and the "Last updated" date will change. Continued use of the extension constitutes acceptance of the updated policy.</p>
+
+    <h2>9. Contact</h2>
+    <p>Questions or requests regarding this privacy policy can be sent to <a href="mailto:nondeader.dev@gmail.com" style="color:#cc9966;">nondeader.dev@gmail.com</a>.</p>
+
+    <div class="footer">
+      <p>UsageX is an open-source extension by <a href="https://usagex.carrd.co/">ayumystic</a> &nbsp;·&nbsp; <a href="https://addons.mozilla.org/en-US/firefox/addon/usagex/">Firefox Add-on listing</a> &nbsp;·&nbsp; MIT License</p>
+    </div>
+
+  </div>
+</body>
+</html>
