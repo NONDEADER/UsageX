@@ -1,0 +1,12 @@
+# Zip builds
+*.zip
+*.xpi
+*.crx
+
+# Developer / System files
+.DS_Store
+Thumbs.db
+
+# Agent directories
+.agents/
+.gemini/
