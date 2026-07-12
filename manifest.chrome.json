@@ -1,0 +1,66 @@
+{
+  "manifest_version": 3,
+  "name": "UsageX v2",
+  "version": "2.1.5",
+  "description": "Track Claude.ai usage stats — session %, weekly %, effort breakdown, and more.",
+  "permissions": [
+    "storage",
+    "alarms",
+    "tabs",
+    "notifications"
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none';"
+  },
+  "host_permissions": [
+    "https://claude.ai/*",
+    "https://www.claude.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*"
+      ],
+      "js": ["inject-loader.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*"
+      ],
+      "js": ["db.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "debug-viewer.html",
+        "debug-viewer.css",
+        "debug-viewer.js",
+        "inject.js",
+        "popup.html",
+        "popup.css",
+        "popup.js"
+      ],
+      "matches": [
+        "https://claude.ai/*",
+        "https://www.claude.ai/*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "UsageX v2",
+    "default_popup": "popup.html"
+  }
+}
