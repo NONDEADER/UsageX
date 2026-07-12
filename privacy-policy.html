@@ -146,7 +146,7 @@
     <p class="subtitle">Last updated: July 2026 &nbsp;·&nbsp; Applies to UsageX v2 (Firefox &amp; Chrome extension)</p>
 
     <div class="callout">
-      <strong>Short version:</strong> UsageX stores all your usage data locally on your device. The only data that ever leaves your device is what <em>you</em> voluntarily submit via the feedback form.
+      <strong>Short version:</strong> UsageX is 100% private and runs entirely locally. It does not transmit any user data, usage statistics, or message contents to external servers.
     </div>
 
     <h2>1. What data is collected</h2>
@@ -165,46 +165,10 @@
       <li>Extension settings (sidebar position, notification preferences, timezone, etc.)</li>
     </ul>
 
-    <h2>2. Data that leaves your device</h2>
+    <h2>2. Data transmission</h2>
+    <p><strong>No data leaves your device.</strong> UsageX makes zero network calls and does not communicate with any external servers or third-party services. All processing and storage occur entirely within your web browser.</p>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Scenario</th>
-          <th>Data sent</th>
-          <th>Destination</th>
-          <th>Trigger</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td><strong>Feedback form</strong></td>
-          <td>Feedback type, message text, optional email address, optional diagnostics snapshot</td>
-          <td>Google Sheets via Google Apps Script (developer-controlled)</td>
-          <td><span class="badge">Manual</span> Only when you click "Send Feedback"</td>
-        </tr>
-        <tr>
-          <td><strong>Everything else</strong></td>
-          <td>Nothing</td>
-          <td>—</td>
-          <td><span class="badge green">Never</span></td>
-        </tr>
-      </tbody>
-    </table>
-
-    <p>The feedback form is entirely optional. Submitting it is always a deliberate, user-initiated action. The form is never triggered automatically.</p>
-
-    <h2>3. Feedback form — detailed breakdown</h2>
-    <p>When you submit the feedback form, the following information is sent in a single HTTPS POST request to a Google Apps Script endpoint operated by the developer:</p>
-    <ul>
-      <li><strong>Feedback type</strong> — Bug, Feature, or Question (you select this)</li>
-      <li><strong>Message</strong> — the text you typed</li>
-      <li><strong>Email</strong> — only if you choose to enter one (the field is optional; it defaults to "Anonymous")</li>
-      <li><strong>Diagnostics snapshot</strong> — only if the "Diagnostics info" toggle is checked (on by default). This includes: extension version, browser user agent string, your Claude plan, timezone setting, today's aggregate message/token counts (numbers only — no message content), and a count of stored debug log entries.</li>
-    </ul>
-    <p>This data is stored in a private Google Spreadsheet visible only to the developer and is used solely to improve UsageX. It is not sold, shared, or used for advertising.</p>
-
-    <h2>4. Permissions — why each is needed</h2>
+    <h2>3. Permissions — why each is needed</h2>
     <table>
       <thead>
         <tr><th>Permission</th><th>Why it's needed</th></tr>
@@ -212,32 +176,30 @@
       <tbody>
         <tr><td><code>storage</code></td><td>Stores all usage stats and settings locally on your device</td></tr>
         <tr><td><code>alarms</code></td><td>Schedules local notifications for session/weekly limit resets</td></tr>
-        <tr><td><code>tabs</code></td><td>Opens internal pages (debug viewer, permissions page), queries active tab to detect Claude.ai context for the popup, and switches focus to an existing open Claude.ai tab to prevent duplicate tabs</td></tr>
+        <tr><td><code>tabs</code></td><td>Queries active tab context to detect Claude.ai in the popup, focuses existing Claude tabs, and opens the debug viewer</td></tr>
         <tr><td><code>notifications</code></td><td>Shows browser-native reset alerts — only if you enable this in Settings</td></tr>
         <tr><td><code>host: claude.ai</code></td><td>Allows the content script and fetch hook to read usage data from Claude's API responses</td></tr>
-        <tr><td><code>host: script.google.com</code></td><td>Allows the background script to POST feedback to the Google Apps Script endpoint — only used when you submit the feedback form</td></tr>
       </tbody>
     </table>
 
-    <h2>5. Data retention and deletion</h2>
+    <h2>4. Data retention and deletion</h2>
     <p>All locally stored data can be deleted at any time from within the extension:</p>
     <ul>
       <li><strong>Reset Stats</strong> — clears today's counters and the 30-day history</li>
       <li><strong>Clear Logs</strong> — deletes all debug log entries</li>
       <li>Uninstalling the extension removes all local storage automatically</li>
     </ul>
-    <p>Data you submitted via the feedback form cannot be retrieved or deleted after submission, as it is stored in the developer's private spreadsheet with no user identifiers (unless you provided an email address, in which case you can request deletion by emailing <a href="mailto:nondeader.dev@gmail.com">nondeader.dev@gmail.com</a>).</p>
 
-    <h2>6. Third-party services</h2>
-    <p>UsageX does not use any analytics services, crash reporting tools, or advertising networks. The only third-party service the extension communicates with is <strong>Google Apps Script</strong>, and only when you explicitly submit feedback.</p>
+    <h2>5. Third-party services</h2>
+    <p>UsageX does not use any analytics services, crash reporting tools, advertising networks, or external cloud backends. The extension is completely offline.</p>
 
-    <h2>7. Children</h2>
-    <p>UsageX is not directed at children under 13 and does not knowingly collect information from children.</p>
+    <h2>6. Children</h2>
+    <p>UsageX does not collect or transmit information from anyone, including children under 13.</p>
 
-    <h2>8. Changes to this policy</h2>
-    <p>If the privacy practices of UsageX change significantly (e.g. new data collection is introduced), this page will be updated and the "Last updated" date will change. Continued use of the extension constitutes acceptance of the updated policy.</p>
+    <h2>7. Changes to this policy</h2>
+    <p>If the privacy practices of UsageX change significantly, this page will be updated and the "Last updated" date will change. Continued use of the extension constitutes acceptance of the updated policy.</p>
 
-    <h2>9. Contact</h2>
+    <h2>8. Contact</h2>
     <p>Questions or requests regarding this privacy policy can be sent to <a href="mailto:nondeader.dev@gmail.com" style="color:#cc9966;">nondeader.dev@gmail.com</a>.</p>
 
     <div class="footer">

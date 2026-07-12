@@ -650,37 +650,9 @@
         </svg>
         Support &amp; Feedback
       </div>
-      <div class="px-feedback-form-container">
-        <form id="px-feedback-form" novalidate>
-          <div class="px-form-row">
-            <div class="px-feedback-type-tabs" role="radiogroup">
-              <button type="button" class="px-feedback-type-tab px-type-active" data-value="bug" aria-checked="true">Bug</button>
-              <button type="button" class="px-feedback-type-tab" data-value="feature" aria-checked="false">Feature</button>
-              <button type="button" class="px-feedback-type-tab" data-value="question" aria-checked="false">Question</button>
-            </div>
-            <input type="hidden" id="px-feedback-type" value="bug">
-            <div class="px-input-wrapper">
-              <svg class="px-input-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-              <input type="email" id="px-feedback-email" class="px-form-input" placeholder="Email (optional)">
-            </div>
-          </div>
-          <div class="px-form-group">
-            <textarea id="px-feedback-message" class="px-form-textarea" placeholder="Describe the issue or suggestion (min 10 chars)..." minlength="10" required></textarea>
-          </div>
-          <div class="px-form-diag-row">
-            <div class="px-form-checkbox-row">
-              <label class="px-toggle">
-                <input type="checkbox" id="px-feedback-diagnostics" checked>
-                <span class="px-toggle-track"></span>
-              </label>
-              <span class="px-form-checkbox-label">Diagnostics info</span>
-            </div>
-            <span class="px-diag-toggle-btn" id="px-diag-toggle-btn">show</span>
-          </div>
-          <pre id="px-diag-pre" style="display: none;"></pre>
-          <button type="submit" id="px-feedback-submit" class="px-form-submit-btn">Send Feedback</button>
-        </form>
-        <div id="px-feedback-status" class="px-feedback-status"></div>
+      <div class="px-feedback-form-container" style="padding: 10px 12px 12px;">
+        <p style="font-size:12.5px;color:var(--px-text-3);margin:0 0 12px;line-height:1.5;">Found a bug, want to request a feature, or have a question? Submit them directly on our GitHub repository issues page.</p>
+        <a href="https://github.com/NONDEADER/UsageX/issues" target="_blank" class="px-form-submit-btn" style="display:block;text-align:center;text-decoration:none;font-weight:600;font-size:12.5px;line-height:2.4;background:var(--px-accent);color:#111;border-radius:6px;width:100%;transition:opacity 0.15s ease;">Open GitHub Issues</a>
       </div>
     </div>
 

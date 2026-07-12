@@ -131,7 +131,6 @@ Or load it as a temporary add-on from source:
 | `tabs` | Opens internal pages in new tabs, queries active tab to detect Claude context, and switches to existing open Claude tabs to avoid duplicates |
 | `notifications` | Shows browser-native reset alerts (only when explicitly enabled by the user in Settings) |
 | `host_permissions: claude.ai` | Allows the content script and fetch hook to run on Claude |
-| `host_permissions: script.google.com` | Used only for the optional user-initiated feedback form submission |
 
 ---
 
@@ -184,15 +183,11 @@ The established MV3 pattern for this is:
 
 For step 1 to work, `inject.js` must be listed in `web_accessible_resources` so the browser permits its URL to be loaded as a page script. All `postMessage` messages are validated with a shared secret and a strict origin allowlist (`https://claude.ai` only) before being acted upon.
 
-The other resources listed (`popup.html/css/js`, `debug-viewer.*`) are opened via `window.open(browser.runtime.getURL(...))` from the content script context and therefore also require `web_accessible_resources` entries. `permissions.html/js` are **not** in `web_accessible_resources` — they are opened exclusively via `browser.tabs.create` from `background.js` (an extension context) which does not require web accessibility.
+The other resources listed (`popup.html/css/js`, `debug-viewer.*`) are opened via `window.open(browser.runtime.getURL(...))` from the content script context and therefore also require `web_accessible_resources` entries.
 
 ### What is stored in `recent_sent_prompts`?
 
 `recent_sent_prompts` contains a rolling window of **djb2 hashes** (32-bit unsigned integers encoded as base-36 strings) of the user's outgoing message text. The hashes are one-way — the original text cannot be recovered from them. They are stored locally in IndexedDB and used exclusively to prevent double-counting when the conversation-history sync replays messages that were already counted in real-time. No message text, summary, or personally identifiable information is stored or transmitted.
-
-### Feedback form network call
-
-The Help tab in the popup contains an optional, user-initiated feedback form. When submitted, the extension sends a `SUBMIT_FEEDBACK` message to `background.js`, which makes a single `POST` request to a Google Apps Script URL (`script.google.com`). This is the **only** outbound network call made by the extension, and it is triggered exclusively by an explicit user action. It is not used for analytics or telemetry.
 
 ### Debug Viewer (`debug-viewer.html`)
 

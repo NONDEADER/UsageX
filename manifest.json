@@ -14,9 +14,7 @@
   },
   "host_permissions": [
     "https://claude.ai/*",
-    "https://www.claude.ai/*",
-    "https://script.google.com/*",
-    "https://script.googleusercontent.com/*"
+    "https://www.claude.ai/*"
   ],
   "background": {
     "scripts": ["background.js"],
