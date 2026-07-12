@@ -2509,46 +2509,52 @@ function bindEvents() {
   });
 
   // Draggable headers (active on home screen, settings screen, or advanced screen when floating)
+  // Uses the Pointer Events API (pointerdown/pointermove/pointerup) which works across mouse,
+  // touch, and stylus input — including Firefox for Android (GeckoView).
   const handles = root.querySelectorAll('#ux-drag-handle, .ux-settings-header');
   if (handles.length > 0) {
-    let dragging = false, ox = 0, oy = 0;
     handles.forEach(handle => {
-      handle.addEventListener('mousedown', (e) => {
+      handle.addEventListener('pointerdown', (e) => {
         if (!root.classList.contains('ux-floating')) return;
         if (root.classList.contains('ux-locked')) return;
         // Avoid dragging when clicking buttons, selects, inputs, or links within the header
         if (e.target.closest('button, select, input, a')) return;
-        dragging = true;
-        ox = e.clientX - root.getBoundingClientRect().left;
-        oy = e.clientY - root.getBoundingClientRect().top;
+        // Capture the pointer so pointermove/pointerup fire even outside the element
+        handle.setPointerCapture(e.pointerId);
+        const ox = e.clientX - root.getBoundingClientRect().left;
+        const oy = e.clientY - root.getBoundingClientRect().top;
         root.style.transition = 'none';
         e.preventDefault();
+
+        const onMove = (ev) => {
+          const nx = Math.max(0, Math.min(window.innerWidth - root.offsetWidth, ev.clientX - ox));
+          const ny = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, ev.clientY - oy));
+          root.style.left = nx + 'px';
+          root.style.top = ny + 'px';
+        };
+
+        const onUp = async () => {
+          handle.removeEventListener('pointermove', onMove);
+          handle.removeEventListener('pointerup', onUp);
+          handle.removeEventListener('pointercancel', onUp);
+          root.style.transition = '';
+          const nx = parseFloat(root.style.left);
+          const ny = parseFloat(root.style.top);
+          await saveSettings({ float_x: nx, float_y: ny });
+          updateUI().catch(() => { });
+        };
+
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
       });
     });
 
+    // Clean up legacy mouse-event listeners if they were previously registered
     if (dragMoveHandler) document.removeEventListener('mousemove', dragMoveHandler);
     if (dragUpHandler) document.removeEventListener('mouseup', dragUpHandler);
-
-    dragMoveHandler = (e) => {
-      if (!dragging) return;
-      const nx = Math.max(0, Math.min(window.innerWidth - root.offsetWidth, e.clientX - ox));
-      const ny = Math.max(0, Math.min(window.innerHeight - root.offsetHeight, e.clientY - oy));
-      root.style.left = nx + 'px';
-      root.style.top = ny + 'px';
-    };
-
-    dragUpHandler = async () => {
-      if (!dragging) return;
-      dragging = false;
-      root.style.transition = '';
-      const nx = parseFloat(root.style.left);
-      const ny = parseFloat(root.style.top);
-      await saveSettings({ float_x: nx, float_y: ny });
-      updateUI().catch(() => { });
-    };
-
-    document.addEventListener('mousemove', dragMoveHandler);
-    document.addEventListener('mouseup', dragUpHandler);
+    dragMoveHandler = null;
+    dragUpHandler = null;
   }
 
   root.querySelector('#ux-setting-resize')?.addEventListener('change', async (e) => {
@@ -2561,60 +2567,54 @@ function bindEvents() {
   const handleRight = root.querySelector('#ux-resize-handle-right');
 
   if (handleLeft && handleRight) {
-    let resizing = false;
-    let resizeSide = null; // 'left' | 'right'
-    let startWidth = 0;
-    let startX = 0;
-    let startLeft = 0;
+    // Use Pointer Events API for resize handles too — works on touch (Firefox for Android)
+    const setupResizeHandle = (handle, side) => {
+      handle.addEventListener('pointerdown', (e) => {
+        if (!root.classList.contains('ux-floating')) return;
+        const startWidth = root.offsetWidth;
+        const startX = e.clientX;
+        const startLeft = parseFloat(root.style.left) || root.getBoundingClientRect().left;
 
-    const onMouseDown = (e, side) => {
-      if (!root.classList.contains('ux-floating')) return;
-      resizing = true;
-      resizeSide = side;
-      startWidth = root.offsetWidth;
-      startX = e.clientX;
-      startLeft = parseFloat(root.style.left) || root.getBoundingClientRect().left;
+        handle.setPointerCapture(e.pointerId);
+        root.style.transition = 'none';
+        handle.classList.add('ux-resizing-active');
 
-      root.style.transition = 'none';
-      const handle = side === 'left' ? handleLeft : handleRight;
-      handle.classList.add('ux-resizing-active');
+        e.preventDefault();
+        e.stopPropagation();
 
-      e.preventDefault();
-      e.stopPropagation();
+        const onMove = (ev) => {
+          let newWidth;
+          if (side === 'left') {
+            const deltaX = ev.clientX - startX;
+            newWidth = Math.max(220, Math.min(500, startWidth - deltaX));
+            const actualDeltaX = startWidth - newWidth;
+            root.style.left = (startLeft + actualDeltaX) + 'px';
+          } else {
+            const deltaX = ev.clientX - startX;
+            newWidth = Math.max(220, Math.min(500, startWidth + deltaX));
+          }
+          root.style.width = newWidth + 'px';
+        };
+
+        const onUp = async () => {
+          handle.removeEventListener('pointermove', onMove);
+          handle.removeEventListener('pointerup', onUp);
+          handle.removeEventListener('pointercancel', onUp);
+          root.style.transition = '';
+          handle.classList.remove('ux-resizing-active');
+          const w = parseInt(root.style.width, 10);
+          const l = parseInt(root.style.left, 10);
+          await saveSettings({ float_width: w, float_x: l });
+        };
+
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
+      });
     };
 
-    handleLeft.addEventListener('mousedown', (e) => onMouseDown(e, 'left'));
-    handleRight.addEventListener('mousedown', (e) => onMouseDown(e, 'right'));
-
-    const onMouseMove = (e) => {
-      if (!resizing) return;
-      let newWidth = startWidth;
-      if (resizeSide === 'left') {
-        const deltaX = e.clientX - startX;
-        newWidth = Math.max(220, Math.min(500, startWidth - deltaX));
-        const actualDeltaX = startWidth - newWidth;
-        root.style.left = (startLeft + actualDeltaX) + 'px';
-      } else {
-        const deltaX = e.clientX - startX;
-        newWidth = Math.max(220, Math.min(500, startWidth + deltaX));
-      }
-      root.style.width = newWidth + 'px';
-    };
-
-    const onMouseUp = async () => {
-      if (!resizing) return;
-      resizing = false;
-      root.style.transition = '';
-      handleLeft.classList.remove('ux-resizing-active');
-      handleRight.classList.remove('ux-resizing-active');
-
-      const w = parseInt(root.style.width, 10);
-      const l = parseInt(root.style.left, 10);
-      await saveSettings({ float_width: w, float_x: l });
-    };
-
-    document.addEventListener('mousemove', onMouseMove);
-    document.addEventListener('mouseup', onMouseUp);
+    setupResizeHandle(handleLeft, 'left');
+    setupResizeHandle(handleRight, 'right');
   }
 }
 
