@@ -2207,6 +2207,15 @@ circle.px-spark-point:hover {
   opacity: 0.7;
 }
 
+.px-btn-github:hover {
+  background: #cc9966 !important;
+  color: #111111 !important;
+  box-shadow: 0 0 12px rgba(204, 153, 102, 0.3) !important;
+  transform: scale(1.015);
+  opacity: 1;
+}
+.px-btn-github:hover svg { fill: #111111; }
+
 .px-feedback-status {
   padding: 6px 8px;
   border-radius: var(--px-radius-sm);
