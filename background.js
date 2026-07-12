@@ -159,6 +159,16 @@ browser.storage.onChanged.addListener(async (changes, area) => {
 });
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && message.action === 'OPEN_TAB') {
+    browser.tabs.create({ url: message.url })
+      .then(() => sendResponse({ success: true }))
+      .catch((err) => {
+        console.error('[UsageX] OPEN_TAB failed:', err);
+        sendResponse({ success: false, error: err.message || String(err) });
+      });
+    return true; // Keep message channel open for async response
+  }
+
   if (message && message.action === 'OPEN_HELP_POPUP') {
     const actionApi = typeof browser !== 'undefined' && browser.action ? browser.action : (typeof chrome !== 'undefined' ? chrome.action : null);
 

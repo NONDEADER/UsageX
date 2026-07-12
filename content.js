@@ -1152,7 +1152,7 @@ function findUserProfileEl(sidebar) {
 
 async function openDebugViewer() {
   const url = browser.runtime.getURL("debug-viewer.html");
-  window.open(url, "usagex-debug-viewer", "width=800,height=600,menubar=no,toolbar=no");
+  browser.runtime.sendMessage({ action: 'OPEN_TAB', url: url });
 }
 
 async function injectSidebar() {
@@ -2497,13 +2497,13 @@ function bindEvents() {
         console.warn('[UsageX] Failed to open popup UI via background script. Error:', response?.error || 'unknown');
         // Open the popup page directly in a new tab as a reliable fallback
         const popupUrl = browser.runtime.getURL('popup.html') + '?tab=help';
-        browser.tabs.create({ url: popupUrl });
+        browser.runtime.sendMessage({ action: 'OPEN_TAB', url: popupUrl });
       }
     } catch (err) {
       console.error('[UsageX] Error during open-help click:', err);
       try {
         const popupUrl = browser.runtime.getURL('popup.html') + '?tab=help';
-        browser.tabs.create({ url: popupUrl });
+        browser.runtime.sendMessage({ action: 'OPEN_TAB', url: popupUrl });
       } catch (_) { }
     }
   });
