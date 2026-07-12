@@ -1153,13 +1153,18 @@ function initOpenClaude() {
       const tabs = await browser.tabs.query({ url: ['https://claude.ai/*', 'https://www.claude.ai/*'] });
       if (tabs.length > 0) {
         await browser.tabs.update(tabs[0].id, { active: true });
-        const win = await browser.windows.get(tabs[0].windowId);
-        await browser.windows.update(win.id, { focused: true });
+        // browser.windows requires the "windows" permission; guard against its absence
+        if (browser.windows && typeof browser.windows.get === 'function') {
+          try {
+            const win = await browser.windows.get(tabs[0].windowId);
+            await browser.windows.update(win.id, { focused: true });
+          } catch (_) { /* window focus is best-effort */ }
+        }
       } else {
         await browser.tabs.create({ url: 'https://claude.ai/' });
       }
     } catch (_) {
-      browser.tabs.create({ url: 'https://claude.ai/' });
+      try { browser.tabs.create({ url: 'https://claude.ai/' }); } catch (_2) { }
     }
     window.close();
   });
