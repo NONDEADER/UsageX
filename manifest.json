@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "UsageX v2",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "Track Claude.ai usage stats — session %, weekly %, effort breakdown, and more.",
   "permissions": [
     "storage",
