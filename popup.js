@@ -2,6 +2,11 @@
 
 if (typeof browser === 'undefined') var browser = chrome;
 
+// Apply mobile compatibility class if on a mobile device
+if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+  document.body.classList.add('ux-mobile');
+}
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 function todayStr(ianaTz) {
