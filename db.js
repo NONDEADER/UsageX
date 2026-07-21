@@ -219,6 +219,45 @@ const UsageXDB = (() => {
     await storage.local.remove(["history"]);
   }
 
+  // Check if we are running in a content script (i.e. on a webpage, not in the extension context)
+  const isContentScript = typeof window !== 'undefined' && 
+    window.location.protocol !== 'chrome-extension:' && 
+    window.location.protocol !== 'moz-extension:';
+
+  if (isContentScript) {
+    const messenger = typeof browser !== 'undefined' ? browser.runtime : chrome.runtime;
+    const delegate = (action) => {
+      return (...args) => {
+        return new Promise((resolve, reject) => {
+          messenger.sendMessage({ target: 'UsageXDB', action, args }, (response) => {
+            const err = typeof chrome !== 'undefined' ? chrome.runtime.lastError : null;
+            if (err) {
+              reject(new Error(err.message));
+              return;
+            }
+            if (response && response.error) {
+              reject(new Error(response.error));
+            } else {
+              resolve(response && response.result);
+            }
+          });
+        });
+      };
+    };
+
+    return {
+      getDailyStats: delegate('getDailyStats'),
+      saveDailyStats: delegate('saveDailyStats'),
+      getAllDailyStats: delegate('getAllDailyStats'),
+      getConvoStats: delegate('getConvoStats'),
+      saveConvoStats: delegate('saveConvoStats'),
+      getTopConversations: delegate('getTopConversations'),
+      getAllConvoStats: delegate('getAllConvoStats'),
+      clearAllStats: delegate('clearAllStats'),
+      migrateFromStorage: delegate('migrateFromStorage')
+    };
+  }
+
   return {
     getDailyStats,
     saveDailyStats,

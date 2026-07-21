@@ -48,7 +48,23 @@ function Build-Zip {
 
     $OutPath = Join-Path $Root $OutputZip
     if (Test-Path $OutPath) { Remove-Item $OutPath -Force }
-    Compress-Archive -Path (Join-Path $TempDir '*') -DestinationPath $OutPath
+    Add-Type -AssemblyName System.IO.Compression
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zipStream = [System.IO.File]::OpenWrite($OutPath)
+    $archive = New-Object System.IO.Compression.ZipArchive($zipStream, [System.IO.Compression.ZipArchiveMode]::Create)
+    $files = Get-ChildItem -Path $TempDir -Recurse -File
+    foreach ($file in $files) {
+        $relativeName = $file.FullName.Substring($TempDir.Length).TrimStart([System.IO.Path]::DirectorySeparatorChar)
+        $entryName = $relativeName.Replace('\', '/')
+        $entry = $archive.CreateEntry($entryName)
+        $entryStream = $entry.Open()
+        $fileStream = [System.IO.File]::OpenRead($file.FullName)
+        $fileStream.CopyTo($entryStream)
+        $fileStream.Close()
+        $entryStream.Close()
+    }
+    $archive.Dispose()
+    $zipStream.Close()
 
     Remove-Item $TempDir -Recurse -Force
     Write-Host "  Built: $OutputZip" -ForegroundColor Green

@@ -4,6 +4,18 @@ if (typeof browser === "undefined") {
   var browser = chrome;
 }
 
+// Load db.js to handle delegated storage actions in the extension context
+let dbLoadingPromise = null;
+if (typeof UsageXDB === 'undefined') {
+  try {
+    importScripts('db.js');
+  } catch (e) {
+    dbLoadingPromise = import('./db.js').catch(err => {
+      console.error('[UsageX] Failed to load db.js:', err);
+    });
+  }
+}
+
 function defaultSettings() {
   return {
     simple_mode: true,
@@ -159,6 +171,25 @@ browser.storage.onChanged.addListener(async (changes, area) => {
 });
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message && message.target === 'UsageXDB') {
+    const { action, args } = message;
+    const execute = () => {
+      if (typeof UsageXDB !== 'undefined' && typeof UsageXDB[action] === 'function') {
+        UsageXDB[action](...args)
+          .then(result => sendResponse({ result }))
+          .catch(error => sendResponse({ error: error.message || String(error) }));
+      } else {
+        sendResponse({ error: `UsageXDB not available or action '${action}' invalid` });
+      }
+    };
+    if (dbLoadingPromise) {
+      dbLoadingPromise.then(execute);
+    } else {
+      execute();
+    }
+    return true; // Keep channel open for async sendResponse
+  }
+
   if (message && message.action === 'OPEN_TAB') {
     browser.tabs.create({ url: message.url })
       .then(() => sendResponse({ success: true }))
